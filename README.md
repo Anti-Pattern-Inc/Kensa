@@ -2,6 +2,16 @@
 
 日本語: [README.ja.md](README.ja.md)
 
+## Super quick start
+
+Paste this into your agent (Claude Code, Kiro, Codex, Cursor, and so on):
+
+```text
+Use https://github.com/Anti-Pattern-Inc/Kensa to run a Well-Architected (W-A) review.
+```
+
+The agent reads this repository, installs the plugin, and starts the review. Agents differ in how much they do on their own; if yours does not install it, or you want to control the install, follow [Get started](#get-started-claude-code).
+
 kensa is an *unofficial*, community-built plugin (Claude Code / Agent Plugins format) that fills in an AWS Well-Architected (W-A) review from the **live environment (read-only), IaC/GitHub (configuration and activity), and business-requirement questions**. It fetches the latest lens (or another lens), asks only what the evidence cannot settle, exports an xlsx with every item filled in, records the answers to the AWS Well-Architected Tool (W-A Tool), and runs a pre-check for the AWS Foundational Technical Review (FTR).
 
 > Version 0.3.0. The parts that run offline are covered by automated tests. The AWS scanner was run against one development account, and writing to the W-A Tool was tried on one test workload. What was and was not verified is listed in [Verification status](docs/verification.md).

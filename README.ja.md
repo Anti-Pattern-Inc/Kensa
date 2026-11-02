@@ -2,6 +2,16 @@
 
 > 英語版が正本です: [README.md](README.md)
 
+## 超クイックスタート
+
+使っているエージェント(Claude Code、Kiro、Codex、Cursor など)に、次をそのまま貼ってください。
+
+```text
+https://github.com/Anti-Pattern-Inc/Kensa をつかって W-A 診断をしてください。
+```
+
+エージェントがこのリポジトリを読み、プラグインを入れて、レビューを始めます。どこまで自分でやるかはエージェントによって違います。入らなかった場合や、インストールを自分で制御したい場合は、[始める(Claude Code)](#始めるclaude-code) に従ってください。
+
 kensa は、AWS Well-Architected(W-A)レビューを、**実環境(読み取り専用)・IaC/GitHub(設定と活動実績)・ビジネス要件の質問**から埋める、*非公式*のコミュニティ製プラグイン(Claude Code / Agent Plugins 形式)です。最新のレンズ(別のレンズも可)を取得し、証拠で決まらないことだけを質問し、全項目を埋めた xlsx を出力し、回答を AWS Well-Architected Tool(W-A Tool)に記録し、AWS Foundational Technical Review(FTR)の事前チェックまで行います。
 
 > バージョン 0.3.0。オフラインで動く部分は自動テスト済み。AWS スキャナーは 1 つの開発用アカウントで、W-A Tool への書き込みはテスト用ワークロード 1 つで実機確認した。確認した範囲と未確認の範囲は [検証状況](docs/ja/verification.md) にある。
