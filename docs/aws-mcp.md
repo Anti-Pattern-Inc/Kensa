@@ -2,20 +2,22 @@
 
 日本語: [ja/aws-mcp.md](ja/aws-mcp.md)
 
-By default, kensa bundles a public endpoint managed by AWS (the AWS MCP Server) in an **unauthenticated, documentation-search-only** form (`aws-docs`). A setup that can call APIs with your AWS credentials is provided separately as an **optional** part (`aws-mcp`). In both cases `scan-aws` does the reading of the live environment. `kensa*.py` never calls MCP. Everything works with the scanner and the interview alone, without MCP.
+kensa ships **no MCP server enabled by default**: installing the plugin does not connect to anything. Two **optional** setups are provided: a public endpoint managed by AWS (the AWS MCP Server) in an **unauthenticated, documentation-search-only** form (`aws-docs`), and a setup that can call APIs with your AWS credentials (`aws-mcp`). In both cases `scan-aws` does the reading of the live environment. `kensa*.py` never calls MCP. Everything works with the scanner and the interview alone, without MCP.
 
-## Default (bundled): `aws-docs` — documentation search only, unauthenticated
+> Why opt-in: a plugin's MCP servers start automatically when the plugin is enabled, the review does not need one, and two of the eight tools it exposes are ones `SKILL.md` tells the agent not to use. Without it the flow opens `improvement_url` directly.
 
-- **Config**: `.mcp.json` (for Claude Code; `type: http`) and `mcp.json` (for Agent Plugins; `type: streamable-http`). Both are only a remote connection to `https://aws-mcp.us-east-1.api.aws/mcp`, and use no credentials, no profile and no `uvx`. The connection is made when the plugin is enabled.
+## Optional: `aws-docs` — documentation search only, unauthenticated
+
+- **Enabling it**: in Claude Code, run `claude mcp add --transport http aws-docs https://aws-mcp.us-east-1.api.aws/mcp` (add `--scope user` to have it in every project). For other agents (Kiro Power, Codex, Cursor, ...) add the `mcpServers` of [`optional/aws-docs.json`](../optional/aws-docs.json) (`type: streamable-http`) to the agent's MCP settings. It is only a remote connection to `https://aws-mcp.us-east-1.api.aws/mcp`, and uses no credentials, no profile and no `uvx`.
 - **Tools used**: `aws___search_documentation` (search) and `aws___read_documentation` (fetch a page), to look up the official documentation for individual items (Phase 1 of `SKILL.md`). In a supporting role: `aws___list_regions`, `aws___get_regional_availability`, `aws___retrieve_skill`.
 - **Tools not used**: `aws___run_script` (runs Python in a sandbox) and `aws___get_presigned_url`. Both have `readOnlyHint=false`, and the official description says API execution requires IAM authentication. This setup passes no credentials, so it does not touch your AWS account. `SKILL.md` also tells the agent not to use them.
 - **What was verified** (2026-11-02, connected without authentication): `initialize` and `tools/list` succeeded, and 8 tools were visible. `readOnlyHint` is `true` for `aws___search_documentation`, `aws___read_documentation`, `aws___get_tasks`, `aws___list_regions`, `aws___get_regional_availability` and `aws___retrieve_skill`, and `false` for `aws___run_script` and `aws___get_presigned_url`. **Not verified**: what happens when `aws___run_script` is called without authentication (it was not called), the quality and speed of search and fetch, and changes on the AWS side (the endpoint and the tools can change).
 - **What leaves your machine**: search terms and the URLs of the pages you fetch are sent to the AWS endpoint. Scan results and account information are not sent (`SKILL.md` tells the agent not to put account IDs, resource names or internal information in search terms). The tool definitions (8 of them) use a little of the conversation context.
-- **Turning it off**: in Claude Code, disable `aws-docs` from `/mcp`, or delete `.mcp.json`.
+- **Turning it off**: in Claude Code, `claude mcp remove aws-docs` (or disable it from `/mcp`).
 
 ## Optional: `aws-mcp` — IAM-authenticated (can also run APIs)
 
-A setup for when you want to run extra read-only API calls through `aws___run_script` (Phase 2 of `SKILL.md`; the `aws` CLI can substitute for it). **It is not bundled by default**: it can run Python with your IAM permissions, so with an administrator profile it could also write. In an environment without `uvx` or AWS credentials it would also be a source of startup errors.
+A setup for when you want to run extra read-only API calls through `aws___run_script` (Phase 2 of `SKILL.md`; the `aws` CLI can substitute for it). **It is not enabled by default**: it can run Python with your IAM permissions, so with an administrator profile it could also write. In an environment without `uvx` or AWS credentials it would also be a source of startup errors.
 
 When you want it, add the `mcpServers` of `optional/aws-mcp.json` to the MCP settings of the agent you use (SigV4; it needs `uvx` and AWS CLI credentials). The proxy is `mcp-proxy-for-aws-cli` (a distribution with pinned dependencies, which the AWS README recommends for `uvx`), pinned to a version. **The same tool names would appear twice, so disable `aws-docs` when you add it.**
 

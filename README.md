@@ -2,9 +2,30 @@
 
 日本語: [README.ja.md](README.ja.md)
 
-## Install this plugin (prompt to paste into your agent)
+kensa is an *unofficial*, community-built plugin (Claude Code / Agent Plugins format) that fills in an AWS Well-Architected (W-A) review from the **live environment (read-only), IaC/GitHub (configuration and activity), and business-requirement questions**. It fetches the latest lens (or another lens), asks only what the evidence cannot settle, exports an xlsx with every item filled in, records the answers to the AWS Well-Architected Tool (W-A Tool), and runs a pre-check for the AWS Foundational Technical Review (FTR).
 
-Paste the following, as is, into the agent you use (Claude Code, Kiro, Codex, Cursor, and so on). The details of each method are under [Install](#install).
+> Version 0.3.0. The parts that run offline are covered by automated tests. The AWS scanner was run against one development account, and writing to the W-A Tool was tried on one test workload. What was and was not verified is listed in [Verification status](docs/verification.md).
+
+## Get started (Claude Code)
+
+```text
+/plugin marketplace add Anti-Pattern-Inc/Kensa
+/plugin install kensa@anti-pattern-plugins
+```
+
+Requirement: Python 3.11 or later (`uv` is recommended: it installs the script dependencies by itself). Then:
+
+| Say or run | What happens |
+|---|---|
+| `/kensa:demo` | Try the whole flow on a **synthetic** checklist: no AWS access, nothing to clean up |
+| `/kensa:start` (or "run a Well-Architected review") | Checks your environment, then starts a review: service overview, business questions, scans, decision cards, xlsx |
+| `/kensa:resume` (add `re-review` for the next round) | Continue where you stopped, or compare against the last review |
+| `/kensa:record` | Record the finished review in the W-A Tool and pre-check the FTR (dry-run first) |
+
+Not using Claude Code, or not sure it installed? Paste the prompt below into your agent ([other install methods](#install)).
+
+<details>
+<summary>Prompt to paste into your agent (Claude Code, Kiro, Codex, Cursor, and so on)</summary>
 
 ```text
 Install the unofficial AWS Well-Architected review assistant plugin "kensa", from the GitHub repository https://github.com/Anti-Pattern-Inc/Kensa, into yourself (this agent). Reply in my language.
@@ -18,17 +39,35 @@ Install the unofficial AWS Well-Architected review assistant plugin "kensa", fro
 4. Finally, tell me in 3 lines how to get started (what I should ask first).
 ```
 
-kensa is an *unofficial*, community-built plugin (Claude Code / Agent Plugins format) that fills in an AWS Well-Architected (W-A) review from the **live environment (read-only), IaC/GitHub (configuration and activity), and business-requirement questions**.
-It fetches the latest lens (or another lens). Items whose evidence only supports a draft need just a confirmation. Organization and process items with no evidence are asked as **option cards with recommendations**. It then exports an xlsx with every item filled in, records the answers to the AWS Well-Architected Tool (W-A Tool), and runs a pre-check for the AWS Foundational Technical Review (FTR).
+</details>
 
-> Version 0.3.0. The parts that run offline are covered by automated tests (177 tests). The AWS scanner was run against one development account, and writing to the W-A Tool was tried on one test workload. What was and was not verified is listed in [Verification status](docs/verification.md).
+New here? [docs/getting-started.md](docs/getting-started.md) walks through the first run: the environment check, the demo, how much AWS access to give it, and how to cut down on permission prompts.
+
+## What a review looks like
+
+1. You describe the service once and answer up to **9 business questions** (each with a recommended option).
+2. kensa fetches the latest lens, sorts every item into decided / draft / interview-only, and scans the repository and (if you allow it) the AWS account, **read-only**.
+3. You answer **up to 30 decision cards** for what the evidence did not settle: each a ○/△/✗ choice, with the evidence already found at the top and a recommendation (steps, effort, priority, owner).
+4. You get the xlsx ([Output](#output-xlsx)). Anything nobody confirmed stays `✗ / assumed (needs confirmation)` and is counted apart from the confirmed items.
+
+How long it takes has not been measured with real users yet; the number of questions is the part you control (answer what you know, assume the rest). You can stop at any point and resume (`/kensa:resume`).
+
+## Pick your AWS access level
+
+| Level | You have | kensa can |
+|---|---|---|
+| **Lv0** | No AWS access | Interview and repository / IaC evidence (`mode iac`), from a checklist you import (`seed --from-csv`) |
+| **Lv1** | A read-only profile | + the live-environment scan (`scan-aws`, 37 checks) |
+| **Lv2** | + a W-A Tool profile | + fetch the latest lens, record answers (`push`), FTR pre-check |
+
+Details and setup: [docs/getting-started.md](docs/getting-started.md#3-choose-how-much-aws-access-to-give-it).
 
 ## What to know first
 
 - **This is an unofficial project.** It is not affiliated with, endorsed by, or sponsored by AWS. Amazon Web Services and AWS are trademarks of Amazon.com, Inc. or its affiliates. Names of AWS services and programs such as "Well-Architected" also belong to their respective owners.
 - **No text written by AWS is bundled.** Question text and best-practice text are fetched at run time from your own W-A Tool (`seed --from-wa-tool`). Everything under `tests/fixtures/` is synthetic data, including the question titles and best-practice names (`QuestionId` and `ChoiceId` are keys of the routing table, so the real identifiers are used). The routing classification in `assets/routing.json` is a design decision of this project, not an AWS classification (`QuestionId` and `ChoiceId` are used as-is, as keys of the routing table).
 - **Running it touches AWS.** Scans are read-only, but `scan-aws` calls the Cost Explorer API a few times (AWS charges 0.01 USD per request, billed per page). `push --apply` and `workload-create --apply` write to the W-A Tool.
-- **A documentation-search MCP (`aws-docs`) is bundled by default.** It is an unauthenticated, documentation-search-only connection to a public endpoint managed by AWS, and it uses no credentials. Your search terms and page URLs are sent to AWS (scan results are not). You can turn it off ([docs/aws-mcp.md](docs/aws-mcp.md)).
+- **No MCP server is enabled by default.** An optional, unauthenticated documentation-search connection to a public AWS endpoint (`aws-docs`) can be added; if you do, your search terms and page URLs are sent to AWS (scan results are not). See [docs/aws-mcp.md](docs/aws-mcp.md).
 - **Start with a test account and a test workload.** Do not use a profile with administrator privileges (the agent has a shell, so the profile's credentials can also be used by other `aws` commands). A template for a read-only role is [`iam/scan-role.yaml`](iam/scan-role.yaml) ([explanation](docs/aws-iam.md)).
 - The software is provided as-is (Apache-2.0). The IAM template has not been audited by a third party.
 
@@ -61,42 +100,12 @@ An unofficial comparison with other tools (as of 2026-11-01) is in [docs/compari
 Requirement: Python 3.11 or later.
 
 - **Claude Code**: `/plugin marketplace add Anti-Pattern-Inc/Kensa` → `/plugin install kensa@anti-pattern-plugins`. With Claude Code 2.1.275 or later, one command also works: `/plugin install kensa --marketplace Anti-Pattern-Inc/Kensa`. From a local clone: `/plugin marketplace add ./Kensa`.
-- **Kiro (Power)**: Powers panel → **Add Custom Power** → **Import power from GitHub** (`https://github.com/Anti-Pattern-Inc/Kensa`). From a cloned folder, use **Import power from a folder**. The Power uses the root `plugin.json`, `skills/` and `mcp.json` (Agent Plugins format) as they are. It activates when the conversation touches a keyword (`well-architected`, `wafr`, `ftr`, `w-a-tool`, `kensa`). **Not verified on a real Kiro** (verified only as far as the official documentation and the Agent Plugins schema).
-- **GitHub CLI (`gh skill`; 2.90 or later, preview)**: `gh skill install Anti-Pattern-Inc/Kensa --all --agent claude-code`. `--agent` can also be `kiro-cli`, `codex`, `cursor` and others, and `--scope user` installs for all projects. **Only the two skills under `skills/` are installed** (the scripts, assets and references live inside each skill). `.mcp.json` (documentation search), the `iam/` template and `docs/` are not installed; get them from the repository if you need them. The two skills are used one after the other (`kensa-partner-record` uses the scripts of `kensa-review`), so install them together with `--all`.
-- **Other Agent Plugins-compatible agents**: they read the same root `plugin.json`, `skills/` and `mcp.json`.
+- **Kiro (Power)**: Powers panel → **Add Custom Power** → **Import power from GitHub** (`https://github.com/Anti-Pattern-Inc/Kensa`). From a cloned folder, use **Import power from a folder**. The Power uses the root `plugin.json` and `skills/` (Agent Plugins format) as they are. It activates when the conversation touches a keyword (`well-architected`, `wafr`, `ftr`, `w-a-tool`, `kensa`). **Not verified on a real Kiro** (verified only as far as the official documentation and the Agent Plugins schema).
+- **GitHub CLI (`gh skill`; 2.90 or later, preview)**: `gh skill install Anti-Pattern-Inc/Kensa --all --agent claude-code`. `--agent` can also be `kiro-cli`, `codex`, `cursor` and others, and `--scope user` installs for all projects. **Only the two skills under `skills/` are installed** (the scripts, assets and references live inside each skill). The `iam/` template, `optional/` and `docs/` are not installed; get them from the repository if you need them. The two skills are used one after the other (`kensa-partner-record` uses the scripts of `kensa-review`), so install them together with `--all`.
+- **Other Agent Plugins-compatible agents**: they read the same root `plugin.json` and `skills/`.
 - **Script dependencies**: `openpyxl` for the xlsx export and `boto3` for the AWS subcommands. **`uv` is recommended**: the top of `kensa.py` declares the dependencies and the Python version, so `uv run skills/kensa-review/scripts/kensa.py …` fetches them automatically on first run. Without `uv`, run `pip install openpyxl boto3` and use `python3`.
-- **MCP**: an unauthenticated documentation search (`aws-docs`) is bundled (`.mcp.json` / `mcp.json`). A setup that authenticates with IAM and can also call APIs (`optional/aws-mcp.json`) can be added optionally. [docs/aws-mcp.md](docs/aws-mcp.md)
-
-## Quick start
-
-Ask the agent "run a W-A review" and the `kensa-review` skill takes it from there, in the order below (the command is `uv run skills/kensa-review/scripts/kensa.py`, or `python3` without `uv`).
-
-```bash
-W="uv run skills/kensa-review/scripts/kensa.py"   # without uv, use python3 (needs pip install openpyxl boto3)
-$W init
-$W context set service.name="…" team.size=4 tools.chat=Slack aws.regions='["ap-northeast-1"]' repo.github=owner/repo
-$W business show                                   # the 9 business-requirement questions (with recommendations)
-$W business answer B-CRITICALITY --option high
-$W seed --from-wa-tool --workload-id <workload-id>   # the latest lens (or --from-csv). The ID is 32 hex digits (printed by `workload-create`)
-$W coverage                                        # breakdown: decided / draft / interview only
-$W scan-repo --path . --gh owner/repo              # IaC, documents, GitHub settings and the last 90 days of activity, CI
-$W context set aws.profile=kensa-scan aws.wa_profile=kensa-wa     # profile for reading / profile for the W-A Tool (wa_profile is optional)
-$W auth-check                                      # check credentials and the target account (STS only; exit code 3 if it fails). For the W-A Tool side: --for wa
-$W scan-aws --profile kensa-scan --regions ap-northeast-1        # read-only (37 checks)
-# If you cannot read AWS, instead of scan-aws: $W mode iac → $W scan-iac --path .   (Confidence up to Medium; shown as 'IaC (live environment not verified)')
-#   → the agent writes verdicts following the interpretation rules, then: $W apply answers.json
-$W cards next -n 3                                 # decision cards for items that were not decided (with the evidence already found)
-# Another lens or new items: $W route-unknown > unknown.json → classify and write routing.json → $W route-apply routing.json
-$W cards answer C-OPS-OWNERSHIP --current partial --choose recommend
-$W finalize && $W export --out .kensa/review.xlsx --mask-account-ids   # --format json for machine-readable output (csv is also available)
-$W push --workload-id <workload-id>                       # dry-run (--apply records; --exclude-assumed does not send assumed items)
-$W precheck --workload-id <workload-id> --solution-name "…"             # FTR pre-check
-# Re-review (for example every quarter): save the previous state → rescan and apply → diff
-$W snapshot --label 2026Q4                         # saves to .kensa/history/ (take it when a review is finished)
-$W diff                                            # worse / improved / confirmed since / lens updates / stale evidence (--since / --stale-days / --json)
-$W push --workload-id <workload-id> --apply --milestone "2026Q4 review"   # the milestone is created only if every question was recorded successfully
-$W iam-policy --kind scan-deny                     # permissions: extra Deny for value-returning reads (wa-tool-read / wa-tool-write also exist)
-```
+- **MCP**: none is enabled by default. An unauthenticated documentation search (`optional/aws-docs.json`; in Claude Code `claude mcp add --transport http aws-docs https://aws-mcp.us-east-1.api.aws/mcp`) and a setup that authenticates with IAM and can also call APIs (`optional/aws-mcp.json`) can be added optionally. [docs/aws-mcp.md](docs/aws-mcp.md)
+- **Check your setup**: ask the agent to run `kensa doctor` (an offline check of Python, `uv`, boto3, openpyxl, `gh` and `aws`, with the next step). [docs/getting-started.md](docs/getting-started.md)
 
 ## Output (xlsx)
 
@@ -129,9 +138,11 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 
 | | |
 |---|---|
+| [Getting started](docs/getting-started.md) | A first run step by step: environment check, the demo, access levels, fewer permission prompts |
+| [CLI reference](docs/cli.md) | The commands the agent runs, in order (what used to be the Quick start) |
 | [Design notes](docs/design.md) | Key design points, generality (another lens, CSV), the IaC-only mode |
 | [Permissions (IAM)](docs/aws-iam.md) | The read-only role template, and the role for the W-A Tool |
-| [AWS MCP Server](docs/aws-mcp.md) | The bundled documentation search (unauthenticated), and the optional IAM-authenticated setup |
+| [AWS MCP Server](docs/aws-mcp.md) | The optional documentation search (unauthenticated), and the optional IAM-authenticated setup |
 | [Verification status](docs/verification.md) | What was verified and what was not, and the first-run checklist |
 | [Known limitations](docs/limitations.md) | Limits of the verdicts, features not implemented |
 | [Comparison notes](docs/comparison.md) | Comparison with existing tools (as of 2026-11-01, unofficial) |
@@ -144,15 +155,16 @@ Kensa/
 ├── README.md / README.ja.md     # English (primary) / Japanese
 ├── plugin.json                  # Agent Plugins format
 ├── .claude-plugin/              # plugin.json / marketplace.json for Claude Code
-├── .mcp.json / mcp.json         # default MCP (unauthenticated documentation search; for Claude Code / for Agent Plugins)
+├── commands/                    # /kensa:start, /kensa:resume, /kensa:record, /kensa:demo (Claude Code entry points)
+├── tools/sync_manifests.py      # derives .claude-plugin/ from plugin.json (checked by the tests)
 ├── iam/scan-role.yaml           # CloudFormation template: read-only scan role (+ optional W-A Tool write role)
-├── optional/aws-mcp.json        # example config for the IAM-authenticated AWS MCP Server (optional; not bundled by default)
+├── optional/                    # aws-docs.json (documentation search, unauthenticated) / aws-mcp.json (IAM-authenticated AWS MCP Server); both opt-in
 ├── docs/                        # design, IAM, verification status, known limitations (English; Japanese in docs/ja/)
 ├── skills/
 │   ├── kensa-review/            # orchestration (Phase 0-5)
-│   │   ├── SKILL.md
-│   │   ├── assets/              # routing.json (routing table + vocabulary) / cards.json (English: 30 decision cards + 9 business questions) / cards.ja.json (Japanese)
-│   │   ├── references/          # routing table, AWS checks and verdict rules, IaC static-scan and verdict rules, repository signals, verdict vocabulary, business requirements
+│   │   ├── SKILL.md             # safety rules and the flow (Step 0 + phase table)
+│   │   ├── assets/              # demo_checklist.csv (synthetic, for `init --demo`) / routing.json (routing table + vocabulary) / cards.json (English: 30 decision cards + 9 business questions) / cards.ja.json (Japanese)
+│   │   ├── references/          # phase-*.md (the procedure of each phase), routing table, AWS checks and verdict rules, IaC static-scan and verdict rules, repository signals, verdict vocabulary, business requirements
 │   │   └── scripts/             # kensa.py (state and export) / kensa_scan.py (AWS, repository, IaC, GitHub) / kensa_wa.py (W-A Tool) / kensa_i18n.py (labels and language resolution) / gen_routing_doc.py (maintenance)
 │   └── kensa-partner-record/    # recording to the W-A Tool and the FTR pre-check
 └── tests/                       # offline tests (no boto3 or network needed; the xlsx export tests are skipped without openpyxl)

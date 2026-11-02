@@ -712,7 +712,8 @@ def make_session(profile=None, region=None):
     try:
         import boto3
     except ImportError:
-        raise SystemExit("boto3 not found. Run `pip install boto3`.")
+        raise SystemExit("boto3 not found. Run through `uv run …/kensa.py` (it installs boto3 automatically), or `python3 -m pip install boto3` "
+                         "(on a PEP 668 system: `python3 -m venv .venv && .venv/bin/pip install boto3 openpyxl`). The offline subcommands do not need boto3.")
     try:
         return boto3.Session(profile_name=profile, region_name=region)
     except Exception as e:  # noqa: BLE001  an unknown profile name raises ProfileNotFound as soon as the Session is created

@@ -254,7 +254,7 @@ class Flow(unittest.TestCase):
         self.assertEqual(self.item("rel_planning_for_recovery_objective_defined_recovery")["verdict"], "✗")
 
     def test_finalize_assumes_unresolved(self):
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         for i in self.work()["items"]:
             self.assertIsNotNone(i["verdict"])
         it = self.item("sec_identities_enforce_mechanisms")
@@ -264,7 +264,7 @@ class Flow(unittest.TestCase):
     @needs_openpyxl
     def test_export_xlsx_and_csv(self):
         run(["cards", "answer", "C-OPS-OWNERSHIP", "--current", "partial"], self.d)
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         from openpyxl import load_workbook
         for lang in ("en", "ja"):
             t = i18n.labels(lang)
@@ -293,7 +293,7 @@ class Flow(unittest.TestCase):
                     "evidence": "account 123456789012 ok"}], f)
         run(["apply", f], self.d)
         c = os.path.join(self.tmp.name, "m.csv")
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         run(["export", "--format", "csv", "--mask-account-ids", "--out", c], self.d)
         self.assertNotIn("123456789012", read_text(c, "utf-8-sig"))
 
@@ -302,7 +302,7 @@ class Flow(unittest.TestCase):
         write_json([{"choice_id": "sec_protect_data_rest_encrypt", "verdict": "○", "channel": "aws", "confidence": "H", "evidence": text}], f)
         code, out, _ = run(["apply", f], self.d)
         self.assertEqual(code, 0, out)
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
 
     def test_csv_export_neutralizes_formula_like_text(self):
         # Evidence can contain external content (tags, descriptions, file contents). It must not be evaluated as a formula in a spreadsheet
@@ -350,7 +350,7 @@ class Flow(unittest.TestCase):
         self.assertFalse(os.path.exists(d2))
 
     def test_seed_merge_flags_new_and_removed(self):
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         rows = list(csv.DictReader(io.StringIO(read_text(FIXTURE))))
         rows = rows[1:] + [{"Pillar": "Security", "QuestionId": "protect-data-rest", "QuestionTitle": "q", "ChoiceId": "sec_protect_data_rest_brand_new",
                            "BestPractice": "New BP", "Description": "d", "AWSCheckable": ""}]
@@ -370,7 +370,7 @@ class Flow(unittest.TestCase):
     def test_push_requires_resolution_and_dry_runs(self):
         code, _, err = run(["push", "--workload-id", "w-1"], self.d)
         self.assertNotEqual(code, 0)
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         code, out, _ = run(["push", "--workload-id", "w-1"], self.d)
         self.assertEqual(code, 0)
         self.assertIn("DRY-RUN", out)
@@ -385,7 +385,7 @@ class Flow(unittest.TestCase):
         self.assertIn("Slack", it["org_shape"])
         self.assertTrue(it["prefilled"])
         # a real answer replaces the proposal; finalize never keeps a prefilled item as resolved
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         self.assertEqual(self.item("ops_ops_model_def_proc_owners")["channel"], "assumed")
 
     def test_gitignore_created(self):
@@ -732,7 +732,7 @@ class DraftEvidence(Flow):
 
     def test_finalize_keeps_drafts_and_flags_them(self):
         self.apply([{"choice_id": self.OBJ, "verdict": "○", "channel": "repo", "confidence": "M", "evidence": "docs/dr.md present"}])
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         it = self.item(self.OBJ)
         self.assertEqual((it["verdict"], it["channel"], it["status"]), ("○", "repo", "needs_review"))
         for lang, tier_label, source in (("ja", "【下書き】", "リポジトリ"), ("en", "[Draft]", "Repository / IaC")):
@@ -984,7 +984,7 @@ class ReReview(Seeded):
 
     def test_snapshot_and_diff_separate_regression_improvement_and_confirmation(self):
         self.apply(aws(ENC, "○"))
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         code, out, _ = run(["snapshot", "--label", "2026 Q1"], self.d)
         self.assertEqual(code, 0, out)
         names = os.listdir(os.path.join(self.d, "history"))
@@ -1042,7 +1042,7 @@ class ReReview(Seeded):
         d = json.loads(run(["diff", "--json"], self.d)[1])
         self.assertEqual([r["choice_id"] for r in d["stale"]], [ENC])
         self.assertEqual(json.loads(run(["diff", "--json", "--stale-days", "300"], self.d)[1])["stale"], [])
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         x = os.path.join(self.tmp.name, "o.xlsx")
         self.assertEqual(run(["export", "--out", x], self.d)[0], 0)
         from openpyxl import load_workbook
@@ -1053,7 +1053,7 @@ class ReReview(Seeded):
     @needs_openpyxl
     def test_checklist_has_a_confirmation_date_column(self):
         self.apply(aws(ENC, "○"))
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         from openpyxl import load_workbook
         for lang in ("en", "ja"):
             x = os.path.join(self.tmp.name, f"o-{lang}.xlsx")
@@ -1069,7 +1069,7 @@ class OutputEnhancements(Seeded):
     def test_export_json_shape_and_masking(self):
         self.apply(aws(ENC, "○", evidence="account 123456789012 ok"))
         run(["context", "set", "aws.account_ids=[\"123456789012\"]", "service.name=svc"], self.d)
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         out = os.path.join(self.tmp.name, "o.json")
         code, msg, _ = run(["export", "--format", "json", "--mask-account-ids", "--out", out], self.d)
         self.assertEqual(code, 0, msg)
@@ -1090,7 +1090,7 @@ class OutputEnhancements(Seeded):
     def test_rates_separate_recorded_from_confirmed(self):
         self.apply(aws(ENC, "○"))
         self.assertEqual(kensa.rates(kensa.active(self.work())), {"total": 12, "recorded": 1, "confirmed": 1, "recorded_rate": 0.083, "confirmed_rate": 0.083})
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         r = kensa.rates(kensa.active(self.work()))
         self.assertEqual((r["recorded"], r["confirmed"]), (12, 1))   # an assumed item is recorded but not confirmed
         self.assertIn("confirmed (excl. assumed and undetermined) 1/12", run(["status"], self.d)[1])
@@ -1099,7 +1099,7 @@ class OutputEnhancements(Seeded):
     def test_summary_rate_columns_and_actionplan_status(self):
         run(["cards", "answer", "C-OPS-OWNERSHIP", "--current", "partial"], self.d)
         self.apply(aws(OWN, "△", channel="interview", confidence="M", due="2026-12-31", action_status="doing"))
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         from openpyxl import load_workbook
         for lang in ("en", "ja"):
             t = i18n.labels(lang)
@@ -1122,7 +1122,7 @@ class OutputEnhancements(Seeded):
 
     def test_push_warns_about_assumed_and_can_exclude_them(self):
         self.apply(aws(ENC, "○"))
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         code, out, _ = run(["push", "--workload-id", "w-1"], self.d)
         self.assertIn("warning: 11 assumed ✗", out)
         code, out, _ = run(["push", "--workload-id", "w-1", "--exclude-assumed"], self.d)
@@ -1130,7 +1130,7 @@ class OutputEnhancements(Seeded):
         self.assertIn("{'dry-run': 1}", out)   # only the one question answered ○ is sent
 
     def test_milestone_option_is_validated_and_dry_run_never_creates_it(self):
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         code, _, err = run(["push", "--workload-id", "w-1", "--milestone", "ab"], self.d)
         self.assertNotEqual(code, 0)
         code, out, _ = run(["push", "--workload-id", "w-1", "--milestone", "2026Q4"], self.d)
@@ -1346,7 +1346,7 @@ class AuthPreflight(Seeded):
         self.assertIn("root", err)
 
     def test_push_dry_run_needs_no_credentials_but_apply_checks_them_first(self):
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
 
         def never(*a, **k):
             raise AssertionError("dry-run must not create an AWS session")
@@ -1418,7 +1418,7 @@ class ProfileSplit(Seeded):
         self.assertEqual(self.used(["auth-check", "--for", "wa"])[0], ["kensa-wa"])
         self.assertEqual(self.used(["precheck", "--workload-id", "w-1"])[0], ["kensa-wa"])
         self.assertEqual(self.used(["seed", "--from-wa-tool", "--workload-id", "w-1"])[0], ["kensa-wa"])
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         self.assertEqual(self.used(["push", "--workload-id", "w-1", "--apply"])[0], ["kensa-wa"])
         self.assertEqual(self.used(["workload-create", "--name", "kensa-test", "--owner", "Taro Yamada taro@example.com", "--apply"])[0][:1], ["kensa-wa"])
 
@@ -1568,7 +1568,7 @@ class Packaging(unittest.TestCase):
         mk = read_json(os.path.join(ROOT, ".claude-plugin", "marketplace.json"))
         versions = {cc["version"], ap["version"], mk["metadata"]["version"], mk["plugins"][0]["version"]}
         self.assertEqual(len(versions), 1, versions)
-        self.assertNotIn("mcpServers", cc)   # the default MCP lives in .mcp.json (read automatically by Claude Code); pinned by the test below
+        self.assertNotIn("mcpServers", cc)   # no MCP is bundled; see test_no_mcp_server_is_enabled_by_default
         self.assertTrue(os.path.isdir(os.path.join(ROOT, cc["skills"])))
         self.assertEqual(cc["keywords"], ap["keywords"])
         self.assertEqual({cc["license"], ap["license"]}, {"Apache-2.0"})
@@ -1579,22 +1579,24 @@ class Packaging(unittest.TestCase):
         opt = read_json(os.path.join(ROOT, "optional", "aws-mcp.json"))
         self.assertIn("aws-mcp", opt["mcpServers"])
 
-    def test_bundled_mcp_is_docs_only_and_credential_free(self):
-        # The MCP installed by default is only a credential-free remote connection. It has no credentials, profile or process launch
-        cc = read_json(os.path.join(ROOT, ".mcp.json"))
-        ap = read_json(os.path.join(ROOT, "mcp.json"))
-        self.assertEqual(ap["$schema"], "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json")
-        self.assertEqual(set(cc), {"mcpServers"})
-        self.assertEqual(set(ap), {"$schema", "mcpServers"})
-        self.assertEqual(set(cc["mcpServers"]), {"aws-docs"})
-        self.assertEqual(set(ap["mcpServers"]), {"aws-docs"})
-        c, a = cc["mcpServers"]["aws-docs"], ap["mcpServers"]["aws-docs"]
-        self.assertEqual(c, {"type": "http", "url": c["url"]})   # the Claude Code type
-        self.assertEqual(a, {"type": "streamable-http", "url": a["url"]})   # the type in the Agent Plugins schema
-        self.assertEqual(c["url"], a["url"])
-        self.assertTrue(c["url"].startswith("https://aws-mcp.") and c["url"].endswith("/mcp"), c["url"])
-        # Server names do not overlap with the optional IAM-authenticated configuration
+    def test_no_mcp_server_is_enabled_by_default(self):
+        # A plugin's MCP servers start automatically on install. The review needs none, so nothing is bundled: both are opt-in files under optional/
+        for rel in (".mcp.json", "mcp.json"):
+            self.assertFalse(os.path.exists(os.path.join(ROOT, rel)), rel)
+        self.assertNotIn("mcpServers", read_json(os.path.join(ROOT, ".claude-plugin", "plugin.json")))
+        self.assertNotIn("mcpServers", read_json(os.path.join(ROOT, "plugin.json")))
+
+    def test_optional_docs_mcp_is_credential_free_and_does_not_clash_with_the_iam_one(self):
+        docs = read_json(os.path.join(ROOT, "optional", "aws-docs.json"))
+        self.assertEqual(docs["$schema"], "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json")
+        self.assertEqual(set(docs), {"$schema", "mcpServers"})
+        self.assertEqual(set(docs["mcpServers"]), {"aws-docs"})
+        d = docs["mcpServers"]["aws-docs"]
+        self.assertEqual(d, {"type": "streamable-http", "url": d["url"]})   # a remote connection only: no credentials, profile or process launch
+        self.assertTrue(d["url"].startswith("https://aws-mcp.") and d["url"].endswith("/mcp"), d["url"])
         self.assertNotIn("aws-docs", read_json(os.path.join(ROOT, "optional", "aws-mcp.json"))["mcpServers"])
+        text = read_text(os.path.join(ROOT, "docs", "aws-mcp.md"))
+        self.assertIn("claude mcp add --transport http aws-docs " + d["url"], text)   # the documented Claude Code opt-in matches the file
 
     def test_skills_follow_the_agent_skills_layout(self):
         # What readers of Agent Skills (Kiro Power, `gh skill install`, ...) expect: skills/<name>/SKILL.md, name equal to the directory name,
@@ -1655,7 +1657,9 @@ class Packaging(unittest.TestCase):
     def test_docs_name_the_current_mcp_tools(self):
         # The official current tool list has no aws___call_aws. Pin that the docs do not go back to recommending the legacy tool name
         rels = ("docs/aws-mcp.md", "skills/kensa-review/SKILL.md", "skills/kensa-review/references/aws-readonly-checks.md")
-        for rel in rels:
+        phase_refs = tuple(f"skills/kensa-review/references/{n}" for n in sorted(os.listdir(os.path.join(ROOT, "skills", "kensa-review", "references")))
+                           if n.startswith("phase-"))
+        for rel in rels + phase_refs:
             with open(os.path.join(ROOT, rel), encoding="utf-8") as f:
                 lines = f.read().splitlines()
             for ln in lines:
@@ -1664,6 +1668,35 @@ class Packaging(unittest.TestCase):
         for rel in rels:
             with open(os.path.join(ROOT, rel), encoding="utf-8") as f:
                 self.assertIn("aws___run_script", f.read(), rel)
+
+    def test_skill_md_stays_slim_and_points_only_to_files_that_exist(self):
+        # SKILL.md is loaded in full every time the skill runs: keep it to the safety rules and the flow, with the per-phase detail in references/
+        base = os.path.join(ROOT, "skills", "kensa-review")
+        text = read_text(os.path.join(base, "SKILL.md"))
+        self.assertLessEqual(len(text.encode("utf-8")), 20000)
+        paths = set(re.findall(r"`((?:references|assets|scripts)/[A-Za-z0-9_.-]+)`", text))
+        self.assertTrue(any(p.startswith("references/phase-") for p in paths))
+        for rel in paths:
+            self.assertTrue(os.path.isfile(os.path.join(base, rel)), rel)
+        for n in os.listdir(os.path.join(base, "references")):
+            if n.startswith("phase-"):
+                self.assertIn(f"references/{n}", text, n)      # every phase file is announced in SKILL.md
+        for ln in text.splitlines():
+            self.assertLessEqual(len(ln), 1200, ln[:60])        # no 1500-character bullets
+
+    def test_commands_are_flat_markdown_entry_points(self):
+        # Claude Code finds commands/*.md next to skills/ without a manifest entry (a "commands" key would replace the default scan, so do not add one)
+        d = os.path.join(ROOT, "commands")
+        names = sorted(n[:-3] for n in os.listdir(d) if n.endswith(".md"))
+        self.assertEqual(names, ["demo", "record", "resume", "start"])
+        for n in names:
+            text = read_text(os.path.join(d, n + ".md"))
+            m = re.match(r"---\n(.*?)\n---\n", text, re.S)
+            self.assertIsNotNone(m, n)
+            fm = dict(re.findall(r"^([a-z-]+): (.*)$", m.group(1), re.M))
+            self.assertTrue(fm.get("description"), n)
+            self.assertIn("kensa-", text, n)                    # each command hands over to one of the two skills
+        self.assertNotIn("commands", read_json(os.path.join(ROOT, ".claude-plugin", "plugin.json")))
 
 
 class PlainLanguageQuestions(Seeded):
@@ -1694,7 +1727,7 @@ class PlainLanguageQuestions(Seeded):
 
     @needs_openpyxl
     def test_questions_sheet_carries_both_wordings(self):
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         from openpyxl import load_workbook
         for lang, marker in (("ja", "専門用語:"), ("en", "Technical wording:")):
             x = os.path.join(self.tmp.name, f"o-{lang}.xlsx")
@@ -1749,7 +1782,7 @@ class ReviewFixes(Seeded):
         run(["context", "set", f"aws.account_ids=[\"{acct}\"]", f"service.name=svc-{acct}"], self.d)
         run(["cards", "answer", "C-OPS-OWNERSHIP", "--current", "partial", "--note", f"owner is account {acct}"], self.d)
         self.apply(aws(ENC, "✗", evidence=f"acct {acct}", org_shape=f"shape {acct}", recommendation=f"fix {acct}", notes=f"n {acct}"))
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         x = os.path.join(self.tmp.name, "m.xlsx")
         self.assertEqual(run(["export", "--mask-account-ids", "--out", x], self.d)[0], 0)
         wb = load_workbook(x)
@@ -1788,7 +1821,7 @@ class ReviewFixes(Seeded):
 
     def test_estimated_hri_counts_only_confirmed_questions(self):
         qs = {i["question_id"] for i in kensa.active(self.work())}
-        run(["finalize"], self.d)   # nothing was confirmed, so every item is an assumed ✗
+        run(["finalize", "--allow-empty"], self.d)   # nothing was confirmed, so every item is an assumed ✗
         est = kensa.estimate_risk(kensa.active(self.work()))
         self.assertEqual(sum(c["HIGH"] for c in est.values()), 0)
         self.assertEqual(sum(c["UNRESOLVED"] for c in est.values()), len(qs))
@@ -2067,7 +2100,7 @@ class IacMode(unittest.TestCase):
     def test_outputs_say_the_judgment_is_not_confirmed_in_the_real_environment(self):
         run(["mode", "iac"], self.d)
         self.apply(iac_entry(self.AWS_ONLY), iac_entry(self.REPO_FIRST))
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         j = os.path.join(self.tmp.name, "o.json")
         run(["export", "--format", "json", "--out", j], self.d)
         doc = read_json(j)
@@ -2096,7 +2129,7 @@ class IacMode(unittest.TestCase):
             self.skipTest("openpyxl is not installed")
         run(["mode", "iac"], self.d)
         self.apply(iac_entry(self.AWS_ONLY))
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         for lang in ("en", "ja"):
             t = i18n.labels(lang)
             x = os.path.join(self.tmp.name, f"o-{lang}.xlsx")
@@ -2351,7 +2384,7 @@ class LanguageResolution(Seeded):
         self.assertFalse([s for s in walk_strings(tpl) if CJK.search(s)])
 
     def test_cli_messages_are_english_whatever_the_export_language(self):
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         for lang in ("en", "ja"):
             for argv in (["plan"], ["status"], ["coverage"], ["mode"], ["push", "--workload-id", "w-1"], ["items", "--limit", "2"],
                          ["snapshot", "--label", f"x{lang}"], ["diff"], ["mode", "iac"], ["mode", "both"]):
@@ -2370,7 +2403,7 @@ class ExportsPerLocale(Seeded):
         self.apply({"choice_id": "rel_planning_for_recovery_dr_tested", "verdict": "△", "channel": "repo", "confidence": "M", "evidence": "docs/dr.md present",
                     "recommendation": "write the DR plan", "owner": "alice"})
         if finalize:
-            run(["finalize"], self.d)
+            run(["finalize", "--allow-empty"], self.d)
 
     def test_json_export_holds_codes_only_and_names_its_language(self):
         self.prepare(finalize=False)
@@ -2381,7 +2414,7 @@ class ExportsPerLocale(Seeded):
             self.assertIn("undetermined", counts)                       # a code, not a label
             self.assertNotIn("未判定", counts)
             self.assertNotIn("Undetermined", counts)
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         for lang in ("en", "ja"):
             p = os.path.join(self.tmp.name, f"o-{lang}.json")
             self.assertEqual(run(["export", "--format", "json", "--out", p], self.d, lang=lang)[0], 0)
@@ -2529,7 +2562,7 @@ class StoredDataIsLanguageNeutral(Seeded):
             self.assertEqual(run(["apply", f], d, lang=lang)[0], 0)
             run(["cards", "answer", "C-OPS-OWNERSHIP", "--current", "none", "--choose", "alt1"], d, lang=lang)
             run(["cards", "answer", "C-SUS-GOALS", "--current", "na"], d, lang=lang)
-            run(["finalize"], d, lang=lang)
+            run(["finalize", "--allow-empty"], d, lang=lang)
             run(["snapshot", "--label", "s"], d, lang=lang)
             for rel in ("worklist.json", "context.json", "card_answers.json"):
                 text = read_text(os.path.join(d, rel))
@@ -2553,7 +2586,7 @@ class StoredDataIsLanguageNeutral(Seeded):
         run(["plan", "--skip", "repo,aws"], self.d)
         run(["cards", "answer", "C-OPS-OWNERSHIP", "--current", "partial", "--choose", "alt1", "--note", "some note"], self.d)
         run(["cards", "answer", "C-OPS-OWNERSHIP", "--current", "none", "--force"], self.d)       # self-reported evidence text
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         for lang in ("en", "ja"):
             p = os.path.join(self.tmp.name, f"o-{lang}.csv")
             run(["export", "--format", "csv", "--out", p], self.d, lang=lang)
@@ -2659,7 +2692,7 @@ class CsvImportHeaders(Seeded):
 
     def test_exports_of_either_locale_can_be_imported_back(self):
         self.apply(aws(ENC, "○", org_shape="shape one"))
-        run(["finalize"], self.d)
+        run(["finalize", "--allow-empty"], self.d)
         for lang in ("en", "ja"):
             p = os.path.join(self.tmp.name, f"back-{lang}.csv")
             run(["export", "--format", "csv", "--out", p], self.d, lang=lang)
@@ -2774,6 +2807,186 @@ class NoJapaneseInTheCliCode(unittest.TestCase):
                 # outside the table: only the status aliases and the system texts / prefixes (both locales sit side by side there)
                 self.assertTrue(n.value in {"未着手", "対応中", "完了"} or n.value in OLD_JA_SYSTEM.values() or n.value in OLD_JA_PREFIX.values(),
                                 (n.lineno, n.value))
+
+
+class Onboarding(unittest.TestCase):
+    """Usability: first-run guidance, the demo sandbox, doctor, and the messages that used to be ambiguous."""
+    def setUp(self):
+        self.tmp = tempfile.TemporaryDirectory()
+        self.d = os.path.join(self.tmp.name, ".kensa")
+
+    def tearDown(self):
+        self.tmp.cleanup()
+
+    def seeded(self):
+        run(["init"], self.d)
+        run(["seed", "--from-csv", FIXTURE], self.d)
+
+    def test_demo_asset_is_the_synthetic_fixture(self):
+        self.assertEqual(read_text(os.path.join(ASSETS, "demo_checklist.csv")), read_text(FIXTURE))
+
+    def test_demo_sandbox_works_offline_and_cannot_reach_the_w_a_tool(self):
+        code, out, _ = run(["init", "--demo"], self.d)
+        self.assertEqual(code, 0, out)
+        w = read_json(os.path.join(self.d, "worklist.json"))
+        self.assertTrue(w["meta"]["demo"])
+        self.assertEqual(len(w["items"]), 12)
+        code, out, _ = run(["cards", "next", "-n", "1"], self.d)
+        self.assertIn("###", out)                         # cards are ready without any scan
+        code, out, err = run(["push", "--workload-id", "0" * 32, "--apply"], self.d)
+        self.assertEqual(code, 2)
+        self.assertIn("demo", err)
+        code, _, err = run(["seed", "--from-csv", FIXTURE], self.d)
+        self.assertEqual(code, 2)
+        self.assertIn("demo", err)
+        code, out, _ = run(["finalize"], self.d)          # scans were skipped on purpose, so no --allow-empty is needed
+        self.assertEqual(code, 0, out)
+        code, out, _ = run(["push", "--workload-id", "0" * 32], self.d)   # the dry run still works
+        self.assertEqual(code, 0, out)
+        code, out, _ = run(["export", "--format", "csv", "--out", os.path.join(self.tmp.name, "d.csv")], self.d)
+        self.assertEqual(code, 0, out)
+
+    def test_demo_refuses_a_directory_that_already_holds_a_review(self):
+        self.seeded()
+        code, _, err = run(["init", "--demo"], self.d)
+        self.assertEqual(code, 2)
+        self.assertIn("--dir", err)
+        self.assertEqual(len(read_json(os.path.join(self.d, "worklist.json"))["items"]), 12)
+
+    def test_init_on_an_existing_review_points_to_plan(self):
+        self.seeded()
+        code, out, _ = run(["init"], self.d)
+        self.assertEqual(code, 0)
+        self.assertIn("already exists", out)
+        self.assertIn("`plan`", out)
+
+    def test_cards_next_tells_waiting_for_scans_from_all_answered(self):
+        self.seeded()
+        code, out, _ = run(["cards", "next"], self.d)
+        self.assertIn("waiting for evidence collection", out)
+        self.assertIn("scan-aws", out)
+        self.assertNotIn("All decision cards are answered", out)
+        run(["plan", "--skip", "aws,repo"], self.d)
+        code, out, _ = run(["cards", "next", "-n", "50"], self.d)
+        cards = re.findall(r"^### (C-[A-Z0-9-]+)", out, re.M)
+        self.assertTrue(cards)
+        for c in cards:
+            run(["cards", "answer", c, "--current", "partial", "--choose", "recommend"], self.d)
+        code, out, _ = run(["cards", "next"], self.d)
+        self.assertIn("All decision cards are answered", out)
+        self.assertNotIn("waiting", out)
+
+    def test_finalize_refuses_an_untouched_review_but_not_after_a_deliberate_skip(self):
+        self.seeded()
+        code, out, err = run(["finalize"], self.d)
+        self.assertEqual(code, 2)
+        self.assertIn("nothing has been scanned", err)
+        self.assertIn("--allow-empty", err)
+        self.assertNotIn("unresolved items set to", out)
+        self.assertTrue(all(i.get("verdict") is None for i in read_json(os.path.join(self.d, "worklist.json"))["items"]))
+        run(["plan", "--skip", "aws,repo"], self.d)
+        code, out, _ = run(["finalize"], self.d)
+        self.assertEqual(code, 0)
+        self.assertIn("unresolved items set to", out)
+
+    def test_finalize_notes_pending_scans_and_unanswered_cards(self):
+        self.seeded()
+        run(["plan", "--skip", "repo"], self.d)       # aws is neither scanned nor skipped
+        code, out, _ = run(["finalize"], self.d)
+        self.assertEqual(code, 0)
+        self.assertIn("aws scan has not been run", out)
+
+    def test_plan_numbers_steps_in_sequence_and_hides_local_paths(self):
+        self.seeded()
+        run(["scan-repo", "--path", self.tmp.name], self.d)
+        code, out, _ = run(["plan"], self.d)
+        steps = re.findall(r"^  (\d+)\. ", out, re.M)
+        self.assertEqual(steps, [str(n) for n in range(1, len(steps) + 1)], out)
+        self.assertNotIn(self.tmp.name, out)
+        self.assertIn("repo (", out)
+
+    def test_business_show_says_unanswered_instead_of_none(self):
+        run(["init"], self.d)
+        code, out, _ = run(["business", "show"], self.d)
+        self.assertIn("(current value: unanswered)", out)
+        self.assertNotIn("current value: None", out)
+        self.assertNotIn("current value: []", out)
+        run(["business", "answer", "B-CRITICALITY", "--option", "high"], self.d)
+        code, out, _ = run(["business", "show"], self.d)
+        self.assertIn("(current value: 'high')", out)
+
+    def test_scan_aws_without_a_region_explains_both_ways_to_set_it(self):
+        self.seeded()
+        code, _, err = run(["scan-aws"], self.d)
+        self.assertEqual(code, 2)
+        self.assertIn("--regions", err)
+        self.assertIn("aws.regions", err)
+
+    def test_every_cards_and_business_subcommand_has_help_text(self):
+        p = kensa.build_parser()
+        for top in ("cards", "business"):
+            sub = next(a for a in p._subparsers._group_actions[0].choices[top]._subparsers._group_actions)
+            for name, sp in sub.choices.items():
+                self.assertTrue(any(ca.dest == name and ca.help for ca in sub._choices_actions), f"{top} {name} has no help")
+
+    def test_doctor_is_offline_and_names_the_access_levels(self):
+        code, out, _ = run(["doctor"], self.d)
+        self.assertEqual(code, 0, out)
+        for word in ("python", "uv", "boto3", "openpyxl", "Lv0", "Lv1", "Lv2", "init --demo"):
+            self.assertIn(word, out)
+        self.assertFalse(os.path.exists(self.d))      # a read-only command: it must not create the state directory
+        run(["init"], self.d)
+        run(["context", "set", "aws.profile=p1"], self.d)
+        code, out, _ = run(["doctor"], self.d)
+        self.assertIn("* Lv1", out)
+        run(["context", "set", "aws.wa_profile=p2"], self.d)
+        code, out, _ = run(["doctor"], self.d)
+        self.assertIn("* Lv2", out)
+
+    def test_missing_dependency_messages_recommend_uv(self):
+        self.assertIn("uv run", read_text(os.path.join(SCRIPTS, "kensa_wa.py")))
+        self.assertIn("uv run", read_text(os.path.join(SCRIPTS, "kensa_scan.py")))
+        self.assertIn("uv run", read_text(os.path.join(SCRIPTS, "kensa.py")).split("openpyxl is required for xlsx", 1)[1][:200])
+
+
+class ManifestSync(unittest.TestCase):
+    """tools/sync_manifests.py: plugin.json is the single place to edit; the Claude Code manifests are derived from it."""
+    def load(self):
+        import importlib.util
+        spec = importlib.util.spec_from_file_location("sync_manifests", os.path.join(ROOT, "tools", "sync_manifests.py"))
+        mod = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(mod)
+        return mod
+
+    def test_repository_manifests_are_in_sync(self):
+        with contextlib.redirect_stdout(io.StringIO()):
+            self.assertEqual(self.load().main(["--check"]), 0)
+
+    def test_a_version_bump_in_plugin_json_reaches_the_derived_files(self):
+        import shutil
+        mod = self.load()
+        with tempfile.TemporaryDirectory() as d:
+            os.makedirs(os.path.join(d, ".claude-plugin"))
+            for rel in ("plugin.json", os.path.join(".claude-plugin", "plugin.json"), os.path.join(".claude-plugin", "marketplace.json")):
+                shutil.copy(os.path.join(ROOT, rel), os.path.join(d, rel))
+            mod.SOURCE = os.path.join(d, "plugin.json")
+            mod.CLAUDE_PLUGIN = os.path.join(d, ".claude-plugin", "plugin.json")
+            mod.MARKETPLACE = os.path.join(d, ".claude-plugin", "marketplace.json")
+            src = read_json(mod.SOURCE)
+            src["version"] = "9.9.9"
+            src["keywords"] = src["keywords"] + ["extra"]
+            write_json(src, mod.SOURCE)
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(mod.main(["--check"]), 1)      # detected, nothing written
+                self.assertEqual(read_json(mod.CLAUDE_PLUGIN)["version"], read_json(os.path.join(ROOT, "plugin.json"))["version"])
+                self.assertEqual(mod.main([]), 0)               # rewritten
+                self.assertEqual(mod.main(["--check"]), 0)
+            cc, mk = read_json(mod.CLAUDE_PLUGIN), read_json(mod.MARKETPLACE)
+            self.assertEqual(cc["version"], "9.9.9")
+            self.assertEqual(cc["keywords"][-1], "extra")
+            self.assertEqual(cc["skills"], "./skills/")
+            self.assertNotIn("$schema", cc)
+            self.assertEqual((mk["metadata"]["version"], mk["plugins"][0]["version"]), ("9.9.9", "9.9.9"))
 
 
 if __name__ == "__main__":

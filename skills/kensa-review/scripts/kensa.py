@@ -396,6 +396,7 @@ def merge_items(old, rows):
 
 
 def cmd_seed(a, st):
+    refuse_demo(load_json(st.p_work) or {}, "seed")
     if a.from_csv:
         rows = parse_checklist_csv(a.from_csv, a.sheet, a.import_verdicts)
         meta = {"source": "csv", "file": os.path.basename(a.from_csv), "lens": "wellarchitected", "lens_version": None, "fetched_at": now_iso()}
@@ -506,14 +507,21 @@ def review_mode(w):
 def ready_for_interview(it, w):
     """An item is ready for its card once the non-interview channels it can use have been tried (or skipped).
     mode=iac does not read the live environment (aws), so items with an aws route wait for the static IaC scan (scan-iac) instead."""
+    return not missing_scans(it, w)
+
+
+def missing_scans(it, w):
+    """The scans (aws / repo / iac) an item still waits for before it can go to an interview card ([] = ready)."""
     sc = scans_done(w)
     iac = review_mode(w) == "iac"
+    need = []
     for ch in it["route"]["ch"]:
         if ch not in ("aws", "repo"):
             continue
-        if ("iac" if iac and ch == "aws" else ch) not in sc:
-            return False
-    return True
+        scan = "iac" if iac and ch == "aws" else ch
+        if scan not in sc and scan not in need:
+            need.append(scan)
+    return need
 
 
 def iac_only_items(w):
@@ -723,7 +731,18 @@ def cmd_cards(a, st):
         answered = st.cards_state()
         pend = [(c, ids) for c, ids in pend if not card_is_answered(answered, c["id"], ids)]
         if not pend:
-            print("All decision cards are answered or waiting for evidence collection. Check `plan` for the next steps.")
+            waiting = collections.OrderedDict()      # card id -> scans it waits for
+            for it in active(w):
+                cid = it["route"].get("card")
+                if cid in by and not resolved(it) and not ready_for_interview(it, w):
+                    waiting.setdefault(cid, set()).update(missing_scans(it, w))
+            if waiting:
+                scans = sorted({s for v in waiting.values() for s in v})
+                hint = {"aws": "`scan-aws` (or `plan --skip aws`)", "repo": "`scan-repo` (or `plan --skip repo`)", "iac": "`scan-iac` (or `plan --skip iac`)"}
+                print(f"No decision card is ready yet: {len(waiting)} card(s) are waiting for evidence collection ({', '.join(scans)}).")
+                print("Run " + " and ".join(hint[s] for s in scans) + " first, so that the cards can show what was already detected. `plan` lists the next steps.")
+            else:
+                print("All decision cards are answered. Run `finalize` when you are ready to export (`plan` lists the next steps).")
             return
         for c, ids in pend[: a.n]:
             print(render_card(c, ctx, ids, a.json, detected_for(w, c["id"])))
@@ -808,7 +827,8 @@ def cmd_business(a, st):
     if a.biz_cmd == "show":
         for b in cards["business"]:
             cur = get_path(ctx, b["sets"])
-            print(f"## {b['id']} — {b['title']}  (current value: {cur!r})")
+            shown = "unanswered" if cur in (None, "", []) else repr(cur)
+            print(f"## {b['id']} — {b['title']}  (current value: {shown})")
             print("Question:", fill(b["ask"], ctx))
             for o in b["options"]:
                 star = " ★ recommended" if o["key"] == b["recommend"] else ""
@@ -886,25 +906,27 @@ def cmd_plan(a, st):
     steps = []
     miss = missing_business(ctx)
     if miss:
-        steps.append(f"1. Business-requirement questions (`business show` → `business answer`): unanswered {miss}")
+        steps.append(f"Business-requirement questions (`business show` → `business answer`): unanswered {miss}")
     if any("repo" in i["route"]["ch"] for i in items) and "repo" not in sc:
-        steps.append("2. Collect repository evidence with `scan-repo --path . [--gh OWNER/REPO]` (includes GitHub activity; or `plan --skip repo`)")
+        steps.append("Collect repository evidence with `scan-repo --path . [--gh OWNER/REPO]` (includes GitHub activity; or `plan --skip repo`)")
     iac = review_mode(w) == "iac"
     if iac:
         if any("aws" in i["route"]["ch"] for i in items) and "iac" not in sc:
-            steps.append("3. Static IaC scan with `scan-iac --path .` (the live AWS environment is not read: mode=iac; or `plan --skip iac`)")
+            steps.append("Static IaC scan with `scan-iac --path .` (the live AWS environment is not read: mode=iac; or `plan --skip iac`)")
     elif any("aws" in i["route"]["ch"] for i in items) and "aws" not in sc:
-        steps.append("3. Read-only AWS scan with `scan-aws --profile P --regions ap-northeast-1` (or `plan --skip aws`)")
+        steps.append("Read-only AWS scan with `scan-aws --profile P [--regions ap-northeast-1]` "
+                     "(--regions defaults to `aws.regions` in the context; run `auth-check` first; or `plan --skip aws`)")
     scan_items = [i for i in items if not resolved(i) and i["route"]["ch"][0] != "interview"]
-    if sc and scan_items:
+    if any(not v.get("skipped") for v in sc.values()) and scan_items:      # skipped scans produced nothing to interpret
         if iac:
-            steps.append(f"4. Record verdicts from the scan results (references/iac-readonly-checks.md, repo-signals.md) with `apply answers.json` "
+            steps.append(f"Record verdicts from the scan results (references/iac-readonly-checks.md, repo-signals.md) with `apply answers.json` "
                          f"(verdicts read from IaC use channel=repo, confidence at most M; {len(scan_items)} item(s) on aws/repo routes still undetermined)")
         else:
-            steps.append(f"4. Record verdicts from the scan results (references/aws-readonly-checks.md, repo-signals.md) with `apply answers.json` ({len(scan_items)} item(s) on aws/repo routes still undetermined)")
+            steps.append(f"Record verdicts from the scan results (references/aws-readonly-checks.md, repo-signals.md) with `apply answers.json` ({len(scan_items)} item(s) on aws/repo routes still undetermined)")
     if pend:
-        steps.append(f"5. Decision cards: {len(pend)} (`cards next -n 5`): " + ", ".join(c["id"] for c, _ in pend[:6]) + (" ..." if len(pend) > 6 else ""))
-    steps.append(f"6. `finalize` marks undetermined items as '{EN['ch']['assumed']}' (✗); then `export --format xlsx`")
+        steps.append(f"Decision cards: {len(pend)} (`cards next -n 5`): " + ", ".join(c["id"] for c, _ in pend[:6]) + (" ..." if len(pend) > 6 else ""))
+    steps.append(f"`finalize` marks undetermined items as '{EN['ch']['assumed']}' (✗); then `export --format xlsx`")
+    steps = [f"{n}. {t}" for n, t in enumerate(steps, 1)]
     tiers = collections.Counter(tier(i) for i in items)
     out = {"total": tot, "resolved": res, "primary_channel": dict(by_ch), "tiers": dict(tiers), "scans": sc, "mode": review_mode(w),
            "pending_cards": [c["id"] for c, _ in pend], "waiting_for_scan": len(waiting), "next_steps": steps}
@@ -915,7 +937,7 @@ def cmd_plan(a, st):
         print(f"mode: {review_mode(w)} — {EN['mode']['iac']}")
     print(f"items {tot} / resolved {res} / primary channel: {dict(by_ch)}")
     print(f"routes: decided {tiers['decide']} / draft {tiers['draft']} / interview-only {tiers['ask']}")
-    print(f"scans: {sc or 'none'}")
+    print("scans: " + (", ".join(f"{k} (skipped)" if v.get("skipped") else f"{k} ({str(v.get('at', ''))[:10]})" for k, v in sc.items()) or "none"))
     print("next steps:")
     print("\n".join("  " + s for s in steps))
 
@@ -1295,7 +1317,7 @@ def cmd_scan_aws(a, st):
     ctx = st.ctx()
     regions = a.regions.split(",") if a.regions else (get_path(ctx, "aws.regions") or [])
     if not regions:
-        die("--regions is required (e.g. ap-northeast-1).")
+        die("no Region given: pass --regions ap-northeast-1 (comma-separated), or set it once with `context set aws.regions='[\"ap-northeast-1\"]'`.")
     session, _ = check_auth(a, st, regions)
     res = kensa_scan.run_aws_scan(session, regions, limit=a.limit, only=set(a.only.split(",")) if a.only else None)
     os.makedirs(st.p_ev, exist_ok=True)
@@ -1323,6 +1345,20 @@ def default_priority(it):
 
 def cmd_finalize(a, st):
     w = st.work()
+    items = active(w)
+    if not scans_done(w) and not any(resolved(i) for i in items) and not a.allow_empty:
+        die(f"nothing has been scanned, recorded or answered yet: `finalize` would mark all {len(items)} items as assumed ✗ (needs confirmation). "
+            "Run `plan` for the next steps (scan, `apply`, `cards next`); skip a scan on purpose with `plan --skip aws,repo`; or pass --allow-empty to finalize anyway.")
+    todo = [i for i in items if i.get("verdict") is None]
+    scans = sorted({s for i in todo for s in missing_scans(i, w)})
+    if scans:
+        print(f"note: the {' / '.join(scans)} scan has not been run (or skipped with `plan --skip`) yet; items that wait for it will become assumed ✗.")
+    cards = load_cards(st)
+    answered = st.cards_state()
+    open_cards = [(c, ids) for c, ids in pending_cards(w, cards) if not card_is_answered(answered, c["id"], ids)]
+    if open_cards:
+        n_items = sum(len(ids) for _, ids in open_cards)
+        print(f"note: {len(open_cards)} decision card(s) are still unanswered ({n_items} items): they will become assumed ✗. `cards next` asks them.")
     n = 0
     for it in active(w):
         if it.get("verdict") is None:
@@ -1484,7 +1520,8 @@ def cmd_export(a, st):
         from openpyxl.formatting.rule import CellIsRule
         from openpyxl.worksheet.datavalidation import DataValidation
     except ImportError:
-        die("openpyxl is required (`pip install openpyxl`). Use --format csv if CSV is enough.")
+        die("openpyxl is required for xlsx. Run through `uv run …/kensa.py` (it installs openpyxl automatically), or `python3 -m pip install openpyxl` "
+            "(on a PEP 668 system: `python3 -m venv .venv && .venv/bin/pip install openpyxl boto3`). `--format csv` needs nothing.")
     cards = load_cards(st)
     wb = Workbook()
     hdr_fill = PatternFill("solid", fgColor="1F3864")
@@ -1683,6 +1720,8 @@ def cmd_push(a, st):
     w = st.work()
     ctx = st.ctx()
     wid = a.workload_id or get_path(ctx, "aws.workload_id") or die("--workload-id is required")
+    if a.apply:
+        refuse_demo(w, "push --apply")
     items = active(w)
     pending = [i for i in items if i.get("verdict") is None]
     if pending and not a.allow_unresolved:
@@ -1759,9 +1798,16 @@ def cmd_iam_policy(a, st):
 
 
 def cmd_init(a, st):
+    if a.demo:
+        return init_demo(a, st)
     os.makedirs(st.dir, exist_ok=True)
     if os.path.exists(st.p_ctx) and not a.force:
-        print(f"{st.p_ctx} already exists (use --force to overwrite)")
+        print(f"{st.p_ctx} already exists (use --force to overwrite).")
+        w = load_json(st.p_work)
+        if w:
+            its = active(w)
+            print(f"  A review is in progress here: {sum(1 for i in its if resolved(i))}/{len(its)} items resolved. "
+                  "Run `plan` to continue it, `snapshot` + a rescan + `diff` for a re-review, or use another --dir for a new review.")
     else:
         ctx = copy.deepcopy(CONTEXT_TEMPLATE)
         if a.lang:
@@ -1770,6 +1816,82 @@ def cmd_init(a, st):
         print(f"created {st.p_ctx}")
     if ensure_gitignore(st.dir):
         print("created .kensa/.gitignore (its contents will not be committed)")
+
+
+DEMO_CSV = "demo_checklist.csv"
+
+
+def init_demo(a, st):
+    """A sandbox state directory with a small synthetic checklist: the whole flow (cards, finalize, export) works without AWS."""
+    if load_json(st.p_work):
+        die(f"{st.dir} already has a worklist. Use a separate directory for the demo, e.g. `--dir .kensa-demo init --demo`.")
+    os.makedirs(st.dir, exist_ok=True)
+    if not os.path.exists(st.p_ctx):
+        ctx = copy.deepcopy(CONTEXT_TEMPLATE)
+        if a.lang:
+            ctx["language"] = a.lang
+        save_json(st.p_ctx, ctx)
+    rows = parse_checklist_csv(os.path.join(ASSETS, DEMO_CSV), 0, False)
+    items, _, _ = merge_items([], rows)
+    apply_routing(items, load_routing(st))
+    now = now_iso()
+    meta = {"source": "demo", "file": DEMO_CSV, "lens": "wellarchitected", "lens_version": None, "fetched_at": now, "seeded_at": now,
+            "demo": True, "none_choices": {},
+            "scans": {"aws": {"skipped": True, "at": now}, "repo": {"skipped": True, "at": now}}}   # the cards are ready at once
+    save_json(st.p_work, {"meta": meta, "items": items})
+    ensure_gitignore(st.dir)
+    print(f"demo state created in {st.dir}: {len(rows)} synthetic best practices (no AWS access; nothing here can be sent to the W-A Tool).")
+    print(f"  Try: `--dir {st.dir} business show` / `plan` / `cards next -n 2` / `cards answer C-OPS-OWNERSHIP --current partial --choose recommend` / `finalize` / `export --format csv --out {st.dir}/demo.csv`")
+
+
+def refuse_demo(w, what):
+    if (w.get("meta") or {}).get("demo"):
+        die(f"this state directory is a demo (synthetic data): `{what}` is disabled. Start a real review in another --dir (the demo never touches the W-A Tool).")
+
+
+def tool_path(name):
+    import shutil
+    return shutil.which(name)
+
+
+def cmd_doctor(a, st):
+    """Offline environment check: what is installed, which AWS access level is configured, and the next step. Touches no network and no AWS."""
+    import importlib.util
+    rows = []     # (status, name, detail)
+
+    def add(ok, name, detail, level="ok"):
+        rows.append(("ok" if ok else level, name, detail))
+    v = sys.version_info
+    add(v >= (3, 11), "python", f"{v.major}.{v.minor}.{v.micro}" + ("" if v >= (3, 11) else " (3.11 or later is required)"), "NG")
+    uv = tool_path("uv")
+    add(bool(uv), "uv", uv or "not found. Recommended: `uv run kensa.py …` fetches boto3 / openpyxl by itself (https://docs.astral.sh/uv/)", "warn")
+    for mod, need in (("boto3", "scan-aws, seed --from-wa-tool, push --apply, precheck"), ("openpyxl", "export --format xlsx")):
+        have = importlib.util.find_spec(mod) is not None
+        add(have, mod, "available" if have else f"not importable in this Python (needed for: {need}). " + ("`uv run` installs it on demand." if uv else f"`python3 -m pip install {mod}`, or install uv."), "warn")
+    add(bool(tool_path("gh")), "gh", tool_path("gh") or "not found (optional: GitHub settings and activity in scan-repo; files are still read)", "info")
+    add(bool(tool_path("aws")), "aws CLI", tool_path("aws") or "not found (optional: kensa uses boto3; the CLI is only needed for `aws sso login`)", "info")
+    mark = {"ok": "[ok]  ", "warn": "[warn]", "NG": "[NG]  ", "info": "[info]"}
+    print("kensa doctor (offline check)")
+    for lvl, name, detail in rows:
+        print(f"  {mark[lvl]} {name:<9} {detail}")
+    ctx = st.ctx() if os.path.exists(st.p_ctx) else {}
+    prof, wa = get_path(ctx, "aws.profile"), get_path(ctx, "aws.wa_profile")
+    env_prof = os.environ.get("AWS_PROFILE") or ("AWS_ACCESS_KEY_ID set" if os.environ.get("AWS_ACCESS_KEY_ID") else None)
+    level = 2 if wa else 1 if (prof or env_prof) else 0
+    print("access level (from configuration only; `auth-check` verifies it against AWS):")
+    print(f"  {'*' if level == 0 else ' '} Lv0 no AWS access : interview + repository (+ `mode iac`); `init --demo` to try the flow")
+    print(f"  {'*' if level == 1 else ' '} Lv1 read-only AWS : `scan-aws` ({'aws.profile=' + prof if prof else 'env ' + env_prof if env_prof else 'set aws.profile'})")
+    print(f"  {'*' if level == 2 else ' '} Lv2 + W-A Tool    : `seed --from-wa-tool` / `push` / `precheck` ({'aws.wa_profile=' + wa if wa else 'set aws.wa_profile (or reuse aws.profile)'})")
+    w = load_json(st.p_work) if os.path.exists(st.p_work) else None
+    if w:
+        its = active(w)
+        print(f"state: {st.dir} has a review in progress ({sum(1 for i in its if resolved(i))}/{len(its)} resolved{', DEMO' if (w.get('meta') or {}).get('demo') else ''}) → `plan`")
+    elif os.path.exists(st.p_ctx):
+        print(f"state: {st.dir} is initialized but has no checklist yet → `seed --from-wa-tool --workload-id …` (needs Lv2) or `seed --from-csv FILE`")
+    else:
+        print("state: none here → `init` (or `--dir .kensa-demo init --demo` to try without AWS)")
+    if any(r[0] == "NG" for r in rows):
+        sys.exit(1)
 
 
 # ------------------------------------------------------------------ CLI
@@ -1787,7 +1909,11 @@ def build_parser():
                    help="language of exports (xlsx/csv/json) and decision cards; default: $KENSA_LANG, then context.json \"language\", then en")
     sp = p.add_subparsers(dest="cmd", required=True)
 
-    s = sp.add_parser("init", help="create the state directory and context.json"); s.add_argument("--force", action="store_true"); s.set_defaults(fn=cmd_init)
+    s = sp.add_parser("init", help="create the state directory and context.json (--demo: a sandbox with a synthetic checklist, no AWS needed)")
+    s.add_argument("--force", action="store_true"); s.add_argument("--demo", action="store_true", help="seed a small synthetic checklist so the whole flow can be tried offline (use a separate --dir)")
+    s.set_defaults(fn=cmd_init)
+    s = sp.add_parser("doctor", help="offline environment check (Python, uv, boto3, openpyxl, gh, aws) and the AWS access level in use; shows the next step")
+    s.set_defaults(fn=cmd_doctor)
 
     s = sp.add_parser("context", help="show or set the review context (service, team, tools, AWS settings, language)"); cs = s.add_subparsers(dest="ctx_cmd", required=True)
     cs.add_parser("show")
@@ -1795,8 +1921,8 @@ def build_parser():
     s.set_defaults(fn=cmd_context)
 
     s = sp.add_parser("business", help="business-requirement questions (Phase 0)"); bs = s.add_subparsers(dest="biz_cmd", required=True)
-    bs.add_parser("show")
-    x = bs.add_parser("answer"); x.add_argument("id"); x.add_argument("--option"); x.add_argument("--text")
+    bs.add_parser("show", help="print the 9 questions with their options and recommendations")
+    x = bs.add_parser("answer", help="record an answer"); x.add_argument("id", help="e.g. B-CRITICALITY"); x.add_argument("--option", help="option key (comma-separated for several)"); x.add_argument("--text", help="free text instead of an option")
     s.set_defaults(fn=cmd_business)
 
     s = sp.add_parser("seed", help="import the checklist (latest lens from the W-A Tool, or a CSV)")
@@ -1831,21 +1957,23 @@ def build_parser():
     s.add_argument("--profile"); s.add_argument("--allow-root", action="store_true", help="allow running with root user credentials (not recommended)"); s.add_argument("--region")
     s.add_argument("--for", dest="target", choices=["scan", "wa"], default="scan", help="scan: the profile that reads AWS (aws.profile) / wa: the profile that touches the W-A Tool (aws.wa_profile)")
     s.set_defaults(fn=cmd_auth_check)
-    s = sp.add_parser("scan-aws", help="read-only scan of the live AWS environment"); s.add_argument("--profile"); s.add_argument("--allow-root", action="store_true", help="allow running with root user credentials (not recommended)"); s.add_argument("--regions"); s.add_argument("--only"); s.add_argument("--limit", type=int, default=200); s.set_defaults(fn=cmd_scan_aws)
+    s = sp.add_parser("scan-aws", help="read-only scan of the live AWS environment"); s.add_argument("--profile"); s.add_argument("--allow-root", action="store_true", help="allow running with root user credentials (not recommended)"); s.add_argument("--regions", help="comma-separated Regions (default: aws.regions in the context)"); s.add_argument("--only", help="comma-separated check ids"); s.add_argument("--limit", type=int, default=200); s.set_defaults(fn=cmd_scan_aws)
 
     s = sp.add_parser("apply", help="record verdicts (and management fields) from a JSON file"); s.add_argument("file"); s.add_argument("--force", action="store_true"); s.set_defaults(fn=cmd_apply)
 
     s = sp.add_parser("cards", help="decision cards"); cs = s.add_subparsers(dest="cards_cmd", required=True)
-    x = cs.add_parser("list"); x.add_argument("--pending", action="store_true")
-    x = cs.add_parser("show"); x.add_argument("id"); x.add_argument("--json", action="store_true")
-    x = cs.add_parser("next"); x.add_argument("-n", type=int, default=3); x.add_argument("--json", action="store_true")
+    x = cs.add_parser("list", help="list all cards with their state (answered / pending / -)"); x.add_argument("--pending", action="store_true", help="only the cards that wait for an answer")
+    x = cs.add_parser("show", help="print one card (question, detected evidence, options, recommendation)"); x.add_argument("id"); x.add_argument("--json", action="store_true")
+    x = cs.add_parser("next", help="print the next cards to ask (only those whose evidence scans are done)"); x.add_argument("-n", type=int, default=3, help="how many cards (default 3)"); x.add_argument("--json", action="store_true")
     cs.add_parser("prefill", help="draft the recommendations as proposals (verdicts are not changed)")
-    x = cs.add_parser("answer"); x.add_argument("id"); x.add_argument("--current", required=True, choices=["full", "partial", "none", "na"])
+    x = cs.add_parser("answer", help="record the current state of a card (and which option to adopt)"); x.add_argument("id"); x.add_argument("--current", required=True, choices=["full", "partial", "none", "na"], help="full=○ / partial=△ / none=✗ / na=N/A")
     x.add_argument("--choose", help="recommend | alt1 | alt2 | current"); x.add_argument("--note"); x.add_argument("--evidence")
     x.add_argument("--override", action="append", help="CHOICE_ID=○|△|✗|N/A"); x.add_argument("--force", action="store_true")
     s.set_defaults(fn=cmd_cards)
 
-    s = sp.add_parser("finalize", help="set undetermined items to the assumed placeholder (✗, confidence L)"); s.set_defaults(fn=cmd_finalize)
+    s = sp.add_parser("finalize", help="set undetermined items to the assumed placeholder (✗, confidence L)")
+    s.add_argument("--allow-empty", action="store_true", help="finalize even if nothing has been scanned, recorded or answered yet")
+    s.set_defaults(fn=cmd_finalize)
     s = sp.add_parser("export", help="write the deliverable (xlsx / csv / json) in the active language"); s.add_argument("--format", choices=["xlsx", "csv", "json"], default="xlsx"); s.add_argument("--out", required=True)
     s.add_argument("--mask-account-ids", action="store_true"); s.set_defaults(fn=cmd_export)
 

@@ -2,9 +2,30 @@
 
 > 英語版が正本です: [README.md](README.md)
 
-## このプラグインを入れる(エージェントに貼るプロンプト)
+kensa は、AWS Well-Architected(W-A)レビューを、**実環境(読み取り専用)・IaC/GitHub(設定と活動実績)・ビジネス要件の質問**から埋める、*非公式*のコミュニティ製プラグイン(Claude Code / Agent Plugins 形式)です。最新のレンズ(別のレンズも可)を取得し、証拠で決まらないことだけを質問し、全項目を埋めた xlsx を出力し、回答を AWS Well-Architected Tool(W-A Tool)に記録し、AWS Foundational Technical Review(FTR)の事前チェックまで行います。
 
-使っているエージェント(Claude Code、Kiro、Codex、Cursor など)に、次をそのまま貼ってください。手順の詳細は [インストール](#インストール)。
+> バージョン 0.3.0。オフラインで動く部分は自動テスト済み。AWS スキャナーは 1 つの開発用アカウントで、W-A Tool への書き込みはテスト用ワークロード 1 つで実機確認した。確認した範囲と未確認の範囲は [検証状況](docs/ja/verification.md) にある。
+
+## 始める(Claude Code)
+
+```text
+/plugin marketplace add Anti-Pattern-Inc/Kensa
+/plugin install kensa@anti-pattern-plugins
+```
+
+要件: Python 3.11 以上(`uv` を勧めます。スクリプトの依存を自動で入れます)。そのあと:
+
+| 言う / 実行する | 起きること |
+|---|---|
+| `/kensa:demo` | **合成データ**のチェックリストで全体の流れを試す。AWS へのアクセスは不要で、後片付けも要らない |
+| `/kensa:start`(または「Well-Architected レビューをして」) | 環境を確認してから、レビューを始める: サービス概要・ビジネス要件・スキャン・決定カード・xlsx |
+| `/kensa:resume`(次の回は `re-review` を付ける) | 止めたところから続ける。または前回のレビューとの差分を見る |
+| `/kensa:record` | 終えたレビューを W-A Tool に記録し、FTR を事前チェックする(まず dry-run) |
+
+Claude Code 以外を使っている、またはインストールできたか分からない場合は、下のプロンプトをエージェントに貼ってください([他のインストール方法](#インストール))。
+
+<details>
+<summary>エージェントに貼るプロンプト(Claude Code、Kiro、Codex、Cursor など)</summary>
 
 ```text
 GitHub のリポジトリ https://github.com/Anti-Pattern-Inc/Kensa にある、AWS Well-Architected レビュー支援プラグイン「kensa」(非公式)を、あなた(このエージェント)に入れてください。
@@ -18,17 +39,35 @@ GitHub のリポジトリ https://github.com/Anti-Pattern-Inc/Kensa にある、
 4. 最後に、使い始め方(最初に何と頼めばよいか)を 3 行で教えてください。
 ```
 
-AWS Well-Architected(W-A)レビューを、**実環境(読み取り専用)・IaC/GitHub(設定と活動実績)・ビジネス要件の質問**から埋める。
-最新のレンズ(別のレンズも可)を取得し、証拠が下書きにとどまる項目は確認だけ、証拠が無い組織・プロセス項目は **推奨付きの選択肢カード**で質問し、全項目を埋めた xlsx を出力する。W-A Tool への記録と FTR 事前チェックまで行う。
+</details>
 
-> バージョン 0.3.0。オフラインで動く部分は自動テスト済み(177 件)。AWS スキャナーは 1 つの開発用アカウントで、W-A Tool への書き込みはテスト用ワークロード 1 つで実機確認した。確認した範囲と未確認の範囲は [検証状況](docs/ja/verification.md) にある。
+初めてなら、[docs/getting-started.md](docs/ja/getting-started.md) が最初の 1 回を順に説明しています(環境チェック・デモ・AWS へのアクセスをどこまで渡すか・許可プロンプトを減らす方法)。
+
+## レビューの進み方
+
+1. サービスの概要を 1 回話し、**ビジネス要件の質問(最大 9 問)**に答えます(各問に推奨の選択肢があります)。
+2. kensa が最新のレンズを取得して全項目を 確定 / 下書き / 面談のみ に振り分け、リポジトリと(許可すれば)AWS アカウントを**読み取り専用**でスキャンします。
+3. 証拠で決まらなかった項目について、**最大 30 枚の決定カード**に答えます。各カードは ○/△/✗ の選択で、先頭に検出済みの証拠、そして推奨(手順・工数・優先度・担当)が付きます。
+4. xlsx が出来上がります([出力](#出力xlsx))。誰も確認していない項目は `✗ / 仮置き(要確認)` のままで、確認済みの項目とは別に数えます。
+
+所要時間は、まだ実際の利用者では測っていません。自分で調整できるのは質問の数です(知っているものに答え、残りは仮置きにできます)。どこで止めても、`/kensa:resume` で再開できます。
+
+## AWS へのアクセスレベルを選ぶ
+
+| レベル | 持っているもの | kensa にできること |
+|---|---|---|
+| **Lv0** | AWS へのアクセスなし | 面談とリポジトリ・IaC の証拠(`mode iac`)。チェックリストは取り込んだもの(`seed --from-csv`)から |
+| **Lv1** | 読み取り専用のプロファイル | + 実環境のスキャン(`scan-aws`、37 チェック) |
+| **Lv2** | + W-A Tool 用のプロファイル | + 最新のレンズの取得、回答の記録(`push`)、FTR 事前チェック |
+
+詳細と準備: [docs/getting-started.md](docs/ja/getting-started.md#3-aws-へのアクセスをどこまで渡すか選ぶ)。
 
 ## 最初に知っておくこと
 
 - **非公式のプロジェクト**です。AWS による提携・推奨・後援はありません。Amazon Web Services、AWS は Amazon.com, Inc. またはその関連会社の商標です。「Well-Architected」などの AWS のサービス・プログラム名も、各権利者に帰属します。
 - **AWS の文章を同梱していません。** 質問文・ベストプラクティス文は、実行時に利用者自身の W-A Tool から取得します(`seed --from-wa-tool`)。`tests/fixtures/` は、質問タイトルやベストプラクティス名も含めて合成データです(`QuestionId`・`ChoiceId` は経路表のキーなので、実際の識別子を使っています)。`assets/routing.json` の経路分類は本プロジェクトの設計判断で、AWS 公式の分類ではありません(`QuestionId`・`ChoiceId` は経路表のキーとして、AWS の識別子をそのまま使っています)。
 - **実行すると AWS に触れます。** スキャンは読み取りのみですが、`scan-aws` は Cost Explorer の API を数回呼びます(AWS の料金は 1 リクエストあたり 0.01 USD。ページごとに課金)。`push --apply` と `workload-create --apply` は W-A Tool に書き込みます。
-- **ドキュメント検索の MCP(`aws-docs`)を既定で同梱しています。** AWS が管理する公開エンドポイントへの、認証なし・ドキュメント検索専用の接続で、資格情報は使いません。検索語とページの URL が AWS に送られます(スキャン結果は送りません)。不要なら無効にできます([docs/aws-mcp.md](docs/ja/aws-mcp.md))。
+- **既定で有効になる MCP サーバーはありません。** 任意で、AWS が管理する公開エンドポイントへの認証なしのドキュメント検索(`aws-docs`)を追加できます。追加した場合、検索語とページの URL が AWS に送られます(スキャン結果は送りません)。[docs/aws-mcp.md](docs/ja/aws-mcp.md) を参照。
 - **まずテスト用のアカウントとワークロードで。** 管理者権限のプロファイルは使わないでください(エージェントはシェルを持つため、プロファイルの資格情報は他の `aws` コマンドにも使われうる)。読み取り専用ロールのテンプレートは [`iam/scan-role.yaml`](iam/scan-role.yaml)([解説](docs/ja/aws-iam.md))。
 - 本ソフトウェアは現状有姿で提供されます(Apache-2.0)。IAM テンプレートは第三者の監査を受けていません。
 
@@ -61,42 +100,12 @@ AWS Well-Architected(W-A)レビューを、**実環境(読み取り専用)・IaC
 要件: Python 3.11 以上。
 
 - **Claude Code**: `/plugin marketplace add Anti-Pattern-Inc/Kensa` → `/plugin install kensa@anti-pattern-plugins`。Claude Code 2.1.275 以降なら 1 コマンドでもよい: `/plugin install kensa --marketplace Anti-Pattern-Inc/Kensa`。ローカルのクローンからは `/plugin marketplace add ./Kensa`。
-- **Kiro(Power)**: Powers パネル → **Add Custom Power** → **Import power from GitHub**(`https://github.com/Anti-Pattern-Inc/Kensa`)。クローンしたフォルダからは **Import power from a folder**。Power はルートの `plugin.json`・`skills/`・`mcp.json`(Agent Plugins 形式)をそのまま使う。会話でキーワード(`well-architected`、`wafr`、`ftr`、`w-a-tool`、`kensa`)に触れると有効になる。**Kiro の実機では未確認**(公式ドキュメントの仕様と、Agent Plugins のスキーマでの検証まで)。
-- **GitHub CLI(`gh skill`。2.90 以降、プレビュー)**: `gh skill install Anti-Pattern-Inc/Kensa --all --agent claude-code`。`--agent` は `kiro-cli`、`codex`、`cursor` などにも変えられ、`--scope user` で全体に入れる。**入るのは `skills/` の 2 つのスキルだけ**(スクリプト・アセット・参考資料は各スキルの中にある)。`.mcp.json`(ドキュメント検索)、`iam/` のテンプレート、`docs/` は入らないので、必要ならリポジトリから取得する。2 つは続けて使う(`kensa-partner-record` は `kensa-review` のスクリプトを使う)ので、`--all` で入れる。
-- **その他の Agent Plugins 対応エージェント**: 同じルートの `plugin.json`・`skills/`・`mcp.json` を読む。
+- **Kiro(Power)**: Powers パネル → **Add Custom Power** → **Import power from GitHub**(`https://github.com/Anti-Pattern-Inc/Kensa`)。クローンしたフォルダからは **Import power from a folder**。Power はルートの `plugin.json`・`skills/`(Agent Plugins 形式)をそのまま使う。会話でキーワード(`well-architected`、`wafr`、`ftr`、`w-a-tool`、`kensa`)に触れると有効になる。**Kiro の実機では未確認**(公式ドキュメントの仕様と、Agent Plugins のスキーマでの検証まで)。
+- **GitHub CLI(`gh skill`。2.90 以降、プレビュー)**: `gh skill install Anti-Pattern-Inc/Kensa --all --agent claude-code`。`--agent` は `kiro-cli`、`codex`、`cursor` などにも変えられ、`--scope user` で全体に入れる。**入るのは `skills/` の 2 つのスキルだけ**(スクリプト・アセット・参考資料は各スキルの中にある)。`iam/` のテンプレート、`optional/`、`docs/` は入らないので、必要ならリポジトリから取得する。2 つは続けて使う(`kensa-partner-record` は `kensa-review` のスクリプトを使う)ので、`--all` で入れる。
+- **その他の Agent Plugins 対応エージェント**: 同じルートの `plugin.json`・`skills/` を読む。
 - **スクリプトの依存**: xlsx 出力に `openpyxl`、AWS 系のサブコマンドに `boto3`。**`uv` を勧める**: `kensa.py` の先頭に依存と Python の版を書いてあるので、`uv run skills/kensa-review/scripts/kensa.py …` だけで初回に自動取得して動く。`uv` が無ければ `pip install openpyxl boto3` のうえ `python3` で動く。
-- **MCP**: 認証なしのドキュメント検索(`aws-docs`)を同梱している(`.mcp.json` / `mcp.json`)。IAM 認証つきで API も呼べる構成(`optional/aws-mcp.json`)は、任意で追加する。[docs/aws-mcp.md](docs/ja/aws-mcp.md)
-
-## クイックスタート
-
-エージェントに「W-Aレビューをして」と頼めば、`kensa-review` スキルが次の順で進める(コマンドは `uv run skills/kensa-review/scripts/kensa.py`。`uv` が無ければ `python3`)。
-
-```bash
-W="uv run skills/kensa-review/scripts/kensa.py"   # uv が無ければ python3(pip install openpyxl boto3 が要る)
-$W init
-$W context set service.name="…" team.size=4 tools.chat=Slack aws.regions='["ap-northeast-1"]' repo.github=owner/repo
-$W business show                                   # ビジネス要件9問(推奨付き)
-$W business answer B-CRITICALITY --option high
-$W seed --from-wa-tool --workload-id <workload-id>   # 最新のレンズ(または --from-csv)。ID は 32 桁の 16 進数(`workload-create` が出す)
-$W coverage                                        # 確定 / 下書き / 面談のみ の内訳
-$W scan-repo --path . --gh owner/repo              # IaC・文書・GitHub の設定と直近90日の活動実績・CI
-$W context set aws.profile=kensa-scan aws.wa_profile=kensa-wa     # 読む用 / W-A Tool に触る用(wa_profile は任意)
-$W auth-check                                      # 認証と接続先アカウントの確認(STS のみ。通らなければ終了コード 3)。W-A Tool 側は --for wa
-$W scan-aws --profile kensa-scan --regions ap-northeast-1        # 読み取り専用(37チェック)
-# AWS を読めない場合は scan-aws の代わりに: $W mode iac → $W scan-iac --path .   (確信度は M まで。『IaC(実環境未確認)』と出る)
-#   → エージェントが解釈ルールに従い判定を書いて: $W apply answers.json
-$W cards next -n 3                                 # 確定しなかった項目の質問カード(検出済みの証拠つき)
-# 別レンズ・新項目: $W route-unknown > unknown.json → 分類して routing.json を作る → $W route-apply routing.json
-$W cards answer C-OPS-OWNERSHIP --current partial --choose recommend
-$W finalize && $W export --out .kensa/review.xlsx --mask-account-ids   # --format json なら機械可読(csv も可)
-$W push --workload-id <workload-id>                       # dry-run(--apply で記録。--exclude-assumed で仮置きを送らない)
-$W precheck --workload-id <workload-id> --solution-name "…"             # FTR 事前チェック
-# 再レビュー(四半期ごとなど): 前回の状態を保存 → 再スキャン・apply → 差分
-$W snapshot --label 2026Q4                         # .kensa/history/ に保存(レビューを終えた時点で取っておく)
-$W diff                                            # 悪化・改善・確認が進んだ・レンズ更新・古い証拠(--since / --stale-days / --json)
-$W push --workload-id <workload-id> --apply --milestone "2026Q4 レビュー"   # 全質問の記録に成功した時だけマイルストーンも作る
-$W iam-policy --kind scan-deny                     # 権限: 値取得系の追加 Deny(wa-tool-read / wa-tool-write もある)
-```
+- **MCP**: 既定で有効なものはない。認証なしのドキュメント検索(`optional/aws-docs.json`。Claude Code では `claude mcp add --transport http aws-docs https://aws-mcp.us-east-1.api.aws/mcp`)と、IAM 認証つきで API も呼べる構成(`optional/aws-mcp.json`)は、任意で追加する。[docs/aws-mcp.md](docs/ja/aws-mcp.md)
+- **環境の確認**: エージェントに `kensa doctor` の実行を頼む(Python・`uv`・boto3・openpyxl・`gh`・`aws` のオフラインチェックと、次の手順)。[docs/getting-started.md](docs/ja/getting-started.md)
 
 ## 出力(xlsx)
 
@@ -127,9 +136,11 @@ JSON 出力(`--format json`)は、項目ごとの判定・確認元・確信度�
 
 | | |
 |---|---|
+| [はじめに](docs/ja/getting-started.md) | 最初の 1 回を順に: 環境チェック・デモ・アクセスレベル・許可プロンプトを減らす方法 |
+| [CLI リファレンス](docs/ja/cli.md) | エージェントが実行するコマンドを順に(旧クイックスタート) |
 | [設計メモ](docs/ja/design.md) | 設計の要点、汎用性(別のレンズ・CSV)、IaC だけのモード |
 | [権限(IAM)](docs/ja/aws-iam.md) | 読み取り専用ロールのテンプレートと、W-A Tool 用ロール |
-| [AWS MCP Server](docs/ja/aws-mcp.md) | 同梱のドキュメント検索(認証なし)と、任意の IAM 認証つき構成 |
+| [AWS MCP Server](docs/ja/aws-mcp.md) | 任意のドキュメント検索(認証なし)と、任意の IAM 認証つき構成 |
 | [検証状況](docs/ja/verification.md) | 確認した範囲・未確認の範囲、初回実行チェックリスト |
 | [既知の制約](docs/ja/limitations.md) | 判定の限界、未実装の機能 |
 | [比較メモ](docs/ja/comparison.md) | 既存ツールとの比較(2026-11-01 時点、非公式) |
@@ -142,15 +153,16 @@ Kensa/
 ├── README.md / README.ja.md     # 英語(正本)/ 日本語
 ├── plugin.json                  # Agent Plugins 形式
 ├── .claude-plugin/              # Claude Code 用 plugin.json / marketplace.json
-├── .mcp.json / mcp.json         # 既定の MCP(認証なしのドキュメント検索。Claude Code 用 / Agent Plugins 用)
+├── commands/                    # /kensa:start・/kensa:resume・/kensa:record・/kensa:demo(Claude Code の入口)
+├── tools/sync_manifests.py      # plugin.json から .claude-plugin/ を生成(テストで確認)
 ├── iam/scan-role.yaml           # スキャン用の読み取り専用ロール(+ 任意で W-A Tool 書き込み用ロール)の CloudFormation テンプレート
-├── optional/aws-mcp.json        # IAM 認証つきの AWS MCP Server の設定例(任意。既定では同梱しない)
+├── optional/                    # aws-docs.json(ドキュメント検索・認証なし)/ aws-mcp.json(IAM 認証つきの AWS MCP Server)。どちらも任意
 ├── docs/                        # 設計・IAM・検証状況・既知の制約(英語。docs/ja/ に日本語版)
 ├── skills/
 │   ├── kensa-review/            # オーケストレーション(Phase 0〜5)
-│   │   ├── SKILL.md
-│   │   ├── assets/              # routing.json(経路表+語彙)/ cards.json(英語。質問カード30+ビジネス質問9)/ cards.ja.json(日本語版)
-│   │   ├── references/          # 経路表・AWSチェックと判定ルール・IaC の静的スキャンと判定ルール・リポジトリ信号・判定語彙・ビジネス要件
+│   │   ├── SKILL.md             # 安全ルールと全体の流れ(Step 0 + フェーズ表)
+│   │   ├── assets/              # demo_checklist.csv(合成データ。`init --demo` 用)/ routing.json(経路表+語彙)/ cards.json(英語。質問カード30+ビジネス質問9)/ cards.ja.json(日本語版)
+│   │   ├── references/          # phase-*.md(各フェーズの手順)・経路表・AWSチェックと判定ルール・IaC の静的スキャンと判定ルール・リポジトリ信号・判定語彙・ビジネス要件
 │   │   └── scripts/             # kensa.py(状態管理・出力)/ kensa_scan.py(AWS・リポジトリ・IaC・GitHub)/ kensa_wa.py(W-A Tool)/ kensa_i18n.py(ラベルと言語の解決)/ gen_routing_doc.py(保守用)
 │   └── kensa-partner-record/    # W-A Tool への記録と FTR 事前チェック
 └── tests/                       # オフラインのテスト(boto3・ネットワーク不要。xlsx 出力のテストは openpyxl が無いと skip)

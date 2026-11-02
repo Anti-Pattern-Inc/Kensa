@@ -1,0 +1,43 @@
+# Phase 0-1: context, business requirements, latest lens
+
+> Detail for the phases of the `kensa-review` skill. `SKILL.md` has the safety rules and the overall flow; read this file when you start the phases below. `W` is the command defined in `SKILL.md` (`uv run …/scripts/kensa.py`).
+
+## Phase 0: Context and business requirements (5 minutes)
+
+**First, ask for an overview of the service, once.** If the user already wrote it in the first message, skip asking, go to step 1, and ask only for what is missing. Example wording:
+
+> Please tell me about your service. You are welcome to paste the site URL or documents (README, design docs, an introduction deck, and so on). As far as you know: what the service is, who uses it, what data it handles, what happens when it goes down, any regulations or certifications, the team structure, and the tools you use.
+
+- If you have a way to fetch a URL (a web-fetch tool, for example), read it. Otherwise, ask the user to paste the key points.
+- Put **only the key points** of the documents into `context set`; do not store the original text. If the documents contain credentials or confidential material, do not record that part, and tell the user.
+- The answers feed step 1 (recording the service overview, team and tools) and step 2 (pre-filling the business requirements).
+- Record **what the user stated explicitly** without asking again, following the rule in step 2. **What you inferred from the site or documents** must first be shown to the user as a list ("this is how I read it") and confirmed before recording. In particular, never settle criticality, data sensitivity or applicable regulations on inference alone. If confirmation is not possible (the user is away or in a hurry), set the recommended value as an assumption and say so at the end.
+- If the answer is "nothing in particular" or "I don't know", move on (the service information may stay blank).
+
+1. Record the information you were given with `W context set` (team composition, tools (GitHub/Slack/CI), service overview and role, AWS profile (`aws.profile`: read-only, for reading AWS; `aws.wa_profile`: for touching the W-A Tool, if you have one; if not, `aws.profile` is used) and regions, the GitHub `owner/repo`, and the W-A Tool workload-id if there is one).
+   Example: `W context set service.name="…" team.size=4 'team.composition={"PO":1,"dev":2,"sales":1}' tools.chat=Slack aws.regions='["ap-northeast-1"]' repo.github=owner/repo`
+2. Run `W business show` to list the 9 business-requirement questions (criticality, availability target, data sensitivity, compliance regulations, traffic, cost sensitivity, environment layout, external integrations, infrastructure-owner availability). **Every question has multiple-choice options with a recommendation (★).** Record the user's answers with `W business answer B-… --option key` (`a,b` for several, `--text` for free text).
+   - Record what can already be answered from earlier input (such as the user's first message) without asking.
+   - If compliance includes `ftr`, the review becomes FTR-targeted (HRI=0 is required for Security / Operational Excellence / Reliability). This changes how priorities are set.
+3. For questions the user is unsure about, set the recommended answer as an assumption and tell the user.
+4. Check **whether the live AWS environment can be read** (is there a read-only profile, and is reading allowed?). If it cannot or should not be read (production is off limits, permissions are not granted, the environment does not exist yet), run `W mode iac` after the Phase 1 `seed` (see "IaC-only mode" in Phase 2).
+
+## Phase 1: Fetch the latest lens and route it
+
+- If a W-A Tool workload exists (or may be created), fetch the **latest** lens: `W seed --from-wa-tool --workload-id <workload-id> --profile P` (takes the questions and choices from `list_answers`, plus the improvement-plan URLs). Only the W-A Tool workload route yields the W-A Tool's ChoiceIds (the official skill builds a per-best-practice list from the official documentation, but it has no ChoiceIds and cannot be used for `push`). If there is no workload, run `W workload-create --name … --owner "Full Name mail@…"` (dry-run → `--apply` after approval).
+  - AWS-provided lenses cannot be written out with ExportLens (per AWS's specification), and ListAnswers requires a WorkloadId. So creating a temporary workload (it creates no resources and incurs no cost) and reading from it is the only route that pulls every item mechanically, with ChoiceIds.
+  - For other lenses (Serverless, SaaS, custom lenses and so on) use `--lens <alias or ARN>` (associate them with `workload-create --lens a,b`). Keep a separate state directory per lens, for example `--dir .kensa-serverless`.
+- If you cannot create a workload, import an existing checklist: `W seed --from-csv file.csv` (columns: Pillar, QuestionId, QuestionTitle, ChoiceId, BestPractice, Description, AWSCheckable; AWSCheckable may be absent). The CSV may also be just a sample for reference and does not depend on any particular sheet.
+- **Items missing from the routing table** (another lens, or items added by a lens update): `seed` prints the count. `W route-unknown` prints the items, the classification vocabulary (vocab) and the card list as JSON; **the agent classifies each item**, writes `{"choices": {CHOICE_ID: {"ch": [...], "areas": [...], "draft": true|false, "card": null|"C-…"}}}`, and registers it with `W route-apply FILE` (saved to `.kensa/routing.local.json`; the bundled routing table is not changed; it survives a re-seed).
+  - List `ch` from most to least reliable, and always end with `interview`. Use `draft:false` only when a configuration value can settle yes or no. Use `draft:true` when you infer from whether documents or activity exist. Items that only a person can answer get just `ch:["interview"]`.
+  - Items you did not register go to individual interviews (`items --unresolved`).
+- When a lens update arrives for an already imported worklist, re-run the same command (it keeps existing verdicts and marks added or removed items). If an answered card gains new items, `cards next` shows that card again (answering overwrites every item of that card with the same verdict).
+- When you need detail on an individual item, if the user has enabled the optional `aws-docs` MCP (documentation search only for the AWS MCP Server, no authentication; it is **not** enabled by default, see `docs/aws-mcp.md`), use `aws___search_documentation` (search) and `aws___read_documentation` (fetch a page) to pull the latest official documentation (check the tool list after connecting). **Do not put account IDs, resource names or internal information in search terms** (search terms are sent to an AWS endpoint). Do not use `aws___run_script` or `aws___get_presigned_url`. If it is not enabled or not connected (the usual case), open `improvement_url` directly. Implementation guidance lives at `improvement_url`. Read the live environment not with MCP but with `scan-aws` (it blocks writes, and its results are reproducible).
+- If you cannot read the live AWS environment, run `W mode iac` here (after `seed`; `W mode` shows the current value and `W mode both` switches back; the mode is stored in the worklist and survives a re-seed).
+- `W plan` prints the counts per route and the next steps.
+
+**Important**: items often written off as "not checkable in AWS" can still be largely reached with evidence. `routing.json` decides the route (aws / repo / interview) for each QuestionId/ChoiceId (`references/evidence-routing.md`). `W coverage` shows the breakdown. For the standard lens (version 2025-02-25, 307 items; `W coverage` prints the real counts for the lens you use):
+- **Decided (226)**: can be judged from AWS and repository evidence (encryption, network defense, logging/detection, secrets, CI/test automation, and so on).
+- **Draft (40)**: the evidence shows that something exists, but a person must confirm how it is really run and its quality (post-mortems, runbooks, escalation, threat models, DR plans, game days, and so on). Pre-fill the evidence in the card so that only confirmation is needed.
+- **Interview only (41)**: culture, priorities, management involvement and the like, which only a person can answer. The existence of documents, regular meetings or training that do not appear in AWS or the repository is also confirmed with a person.
+**Always fill from evidence before interviewing.**

@@ -15,7 +15,7 @@ python3 -B -m unittest discover -s tests
 
 - Python 3.11 以上。
 - IAM テンプレートは `cfn-lint iam/scan-role.yaml` でも確認してください。
-- マニフェストを変えたら `claude plugin validate .` で確認してください。
+- マニフェスト: `plugin.json`(Agent Plugins 形式。唯一の正本)を編集し、`python3 tools/sync_manifests.py` で `.claude-plugin/plugin.json` と `.claude-plugin/marketplace.json` の版を再生成してください(ずれるとテストが失敗します)。リリースの版上げは、`plugin.json` の `version` を変えてスクリプトを実行することです。そのあと `claude plugin validate .` で確認してください。
 
 ## 方針
 
@@ -25,3 +25,6 @@ python3 -B -m unittest discover -s tests
 - **「確認していないこと」を確認済みとして書かない。** README や `docs/verification.md` の記述は、実際に行った確認に合わせてください。
 - **2 つのロケールをそろえる。** カード・スキル・参考資料は英語が先です。`assets/cards.json` を変えたら、`assets/cards.ja.json` にも同じキー・ID・プレースホルダー(`{service}`、`{po}`、`{chat}`、`{vcs}`、`{ticket}` など)を保ち、文章の値だけが違うようにしてください。英語のドキュメントが正本で、`docs/ja/` と `README.ja.md` の日本語版はそれに従います。
 - 名前に AWS のマークを組み込まない(AWS Trademark Guidelines)。説明文での記述的な使用(「for AWS Well-Architected」など)は構いません。
+- **`SKILL.md` は短く保つ。** スキルが動くたびに全文が読み込まれます(テストでサイズに上限をかけています)。置くのは安全ルールと流れで、各フェーズの手順は `skills/kensa-review/references/phase-*.md` に置きます。README や `docs/` に書いてあることは繰り返さないでください。
+- **入口**: `commands/*.md` は Claude Code のスラッシュコマンド(`/kensa:start`・`/kensa:resume`・`/kensa:record`・`/kensa:demo`)で、スキルへ引き渡すだけです。他のエージェントはスキルを直接使います。
+- **使い勝手の変更にもテストを。** 初回の動作(次にすることを示すメッセージ、デモのサンドボックス、`doctor`、`finalize` のガード)は `tests/test_kensa.py`(`Onboarding`)で固定しています。

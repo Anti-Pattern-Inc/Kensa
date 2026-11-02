@@ -15,7 +15,7 @@ python3 -B -m unittest discover -s tests
 
 - Python 3.11 or later.
 - Also check the IAM template with `cfn-lint iam/scan-role.yaml`.
-- After changing a manifest, check with `claude plugin validate .`.
+- Manifests: edit `plugin.json` (Agent Plugins format; the one source of truth), then run `python3 tools/sync_manifests.py` to regenerate `.claude-plugin/plugin.json` and the versions in `.claude-plugin/marketplace.json` (the tests fail when they drift). Bumping a release = change `version` in `plugin.json` and run the script. Then check with `claude plugin validate .`.
 
 ## Guidelines
 
@@ -25,3 +25,6 @@ python3 -B -m unittest discover -s tests
 - **Do not write something as verified when you have not verified it.** Make the statements in the README and `docs/verification.md` match the checks that were actually done.
 - **Keep the two locales in step.** Cards, skills and references are English-first. When you change `assets/cards.json`, keep the same keys, ids and placeholders (`{service}`, `{po}`, `{chat}`, `{vcs}`, `{ticket}`, and so on) in `assets/cards.ja.json`; only the prose values differ. The English documentation is the primary version, and the Japanese copies under `docs/ja/` and `README.ja.md` follow it.
 - Do not build the AWS mark into a name (AWS Trademark Guidelines). Descriptive use in a description (for example "for AWS Well-Architected") is fine.
+- **Keep `SKILL.md` short.** It is loaded in full every time the skill runs (a test caps its size). It holds the safety rules and the flow; the procedure of each phase lives in `skills/kensa-review/references/phase-*.md`. Do not repeat what the README or `docs/` already say.
+- **Entry points**: `commands/*.md` are the Claude Code slash commands (`/kensa:start`, `/kensa:resume`, `/kensa:record`, `/kensa:demo`); they only hand over to the skills. Other agents use the skills directly.
+- **Usability changes need a test too.** First-run behaviour (messages that say what to do next, the demo sandbox, `doctor`, the `finalize` guard) is pinned in `tests/test_kensa.py` (`Onboarding`).
