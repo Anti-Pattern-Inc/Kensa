@@ -1,0 +1,18 @@
+# 権限(IAM)
+
+> 英語版が正本です: [docs/aws-iam.md](../aws-iam.md)
+
+- **方針**: プラグインは IAM のリソースを作らない(IAM の書き込み権限が要り、「読み取り専用」と矛盾するため)。使うプロファイルの**方式は問わない**(SSO・環境変数・assume-role・インスタンスロール。boto3 の標準の探索順)。ただし**管理者権限のプロファイルは使わない**(root ユーザーの認証情報では、`auth-check` や `scan-aws` などが止まる。`--allow-root` で明示した時だけ通る): エージェントはシェルを持つので、プロファイルの資格情報はスキャナーのコード以外の `aws` コマンドにも使われうる。コードの読み取り専用ブロックが守れるのはスキャナーを通る経路だけで、本当の境界は IAM。手持ちの読み取り専用ロール(監査用の `SecurityAudit` など)があればそれを `--profile` で指せばよい。無ければ、下のテンプレートで作る。
+- **プロファイルを2つに分ける**: AWS 環境を読むプロファイル(`aws.profile`。読み取り専用)と、W-A Tool に触るプロファイル(`aws.wa_profile`。`seed --from-wa-tool` / `push` / `precheck` / `workload-create` が使う)。書き込み権限を W-A Tool 用のロールだけに持たせ、スキャン用のロールには持たせないため。`aws.wa_profile` が無ければ `aws.profile` を使う(分けない運用もできる)。`--profile` は常に優先。`auth-check` はスキャン側、`auth-check --for wa` が W-A Tool 側を確認する。
+- **テンプレート `iam/scan-role.yaml`**(CloudFormation): スキャン用ロール(`ReadOnlyAccess` + `SecurityAudit` + 値の読み取りを拒否する Deny)と、`CreateWaToolRole=true` の時だけ作る W-A Tool 書き込み用ロールの2つ。**誰が引き受けられるか**は `TrustedPrincipalArnPattern`(必須)で絞る。中身を読んでから、自分で deploy する(`--capabilities CAPABILITY_NAMED_IAM` が要る)。
+  ```bash
+  aws cloudformation deploy --template-file iam/scan-role.yaml --stack-name kensa-roles \
+    --capabilities CAPABILITY_NAMED_IAM --profile <管理できるプロファイル> \
+    --parameter-overrides TrustedPrincipalArnPattern='arn:aws:iam::123456789012:role/aws-reserved/sso.amazonaws.com/*AWSReservedSSO_PowerUserAccess_*' CreateWaToolRole=true
+  aws cloudformation describe-stacks --stack-name kensa-roles --query 'Stacks[0].Outputs'   # ~/.aws/config に貼る行(ProfileSnippet)が出る
+  ```
+  Deny と W-A Tool の許可アクションは `iam-policy` の出力と同じで、テストで一致を固定している(コードの遮断とずれない)。`cfn-lint` は通っている(`uvx cfn-lint iam/scan-role.yaml`)。**実アカウント 1 つで、deploy・assume-role・スキャン・W-A Tool 用ロールでの記録まで確認した。未確認なのは、信頼先に含まれない主体が引き受けられないこと(拒否の確認)と、`TrustedAccountId` に別のアカウントを指定した場合**([検証状況](verification.md))。
+- **スキャン用ロール**: これまでどおり `ReadOnlyAccess` + `SecurityAudit`(`references/aws-readonly-checks.md`)。これらは広いので、**値や本文を返す既知の読み取りを拒否する追加の Deny**(網羅ではない。下の「この Deny の保証範囲」)を付ける。`kensa.py iam-policy --kind scan-deny` が JSON を出す(Secrets Manager・SSM パラメータ・S3 オブジェクト・Lambda の設定・ECR の認証トークン・CloudWatch Logs の本文・Athena のクエリ結果・CloudFormation のテンプレート・CodeCommit の Blob・EC2 のコンソール出力・Redshift の一時認証など、値や本文を返す読み取りと、DynamoDB などのデータ本体の読み取り。API キーの値は、IAM では `apigateway:GET` が全ての GET を含むため Deny できず、コードの遮断だけ)。
+- **この Deny の保証範囲**: 上の一覧は、値や本文を返す**既知の**読み取りで、`ReadOnlyAccess` と `SecurityAudit` が許可するデータ取得を網羅するものではない。例えば `ReadOnlyAccess` は `codecommit:Get*` と `codecommit:GitPull`(ファイル本文を返す)、`codebuild:BatchGet*`(ビルドの環境変数)を許可する(AWS 公式のポリシー、2026-11-02 に確認。一覧には `GetFile`・`GitPull`・`BatchGetBuilds` を足した)。一覧に無い読み取りは、**同じロールを使う別のコマンドからは実行できる**(スキャナーのコードの遮断は、スキャナーが呼ぶ API だけを守る)。値を絶対に読ませたくない場合は、マネージドポリシーを使わず、スキャナーが呼ぶ API だけを許可する独自のポリシーに置き換える(許可リストは、下の理由で出していない)。
+- **W-A Tool 用**: `iam-policy --kind wa-tool-read`(質問の取得・レポートの読み取り)/ `--kind wa-tool-write`(`UpdateAnswer`・`CreateWorkload`・`CreateMilestone` を追加)。許可するアクションは、コードが呼ぶ API と一致することをテストで固定している。`Resource` は `*` で出すので、実環境で動作を確認した後にワークロードの ARN へ絞る。
+- **許可リスト(API ごとの最小権限)は出さない**。スキャナーが呼ぶ API は数十あり、API 名と IAM アクション名が一致しないものもある(例: S3 の `GetBucketEncryption` は `s3:GetEncryptionConfiguration`)。オフラインで検証できないまま「最小権限」と名乗るのは避けた。実アカウントで `denied` を見ながら絞る。

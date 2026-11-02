@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# kensa state and outputs. They contain account IDs and infrastructure details: never commit them.
+.kensa/
+.kensa-*/
+kensa*.xlsx
+kensa*.csv
+kensa*.pdf
+*.local.json
+
+# editors / OS
+.DS_Store
+.idea/
+.vscode/
+
+# Claude Code local state
+.claude/
+
+# local-only reference material for development (not published)
+_ref/

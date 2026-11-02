@@ -1,0 +1,11 @@
+{
+  "name": "kensa",
+  "version": "0.3.0",
+  "description": "Unofficial plugin that fills in an AWS Well-Architected review from the live environment (read-only), IaC and GitHub, and interview questions: latest lens, decision cards with recommendations, xlsx export, W-A Tool recording and FTR pre-check. Not affiliated with AWS.",
+  "author": {"name": "株式会社アンチパターン"},
+  "homepage": "https://github.com/Anti-Pattern-Inc/Kensa",
+  "repository": "https://github.com/Anti-Pattern-Inc/Kensa",
+  "license": "Apache-2.0",
+  "keywords": ["well-architected", "wafr", "ftr", "w-a-tool", "kensa"],
+  "skills": "./skills/"
+}

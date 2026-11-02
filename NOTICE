@@ -1,0 +1,10 @@
+kensa
+Copyright 2026 株式会社アンチパターン
+
+This product is an unofficial, community-built tool. It is not affiliated with,
+endorsed by, or sponsored by Amazon Web Services. Amazon Web Services and AWS are
+trademarks of Amazon.com, Inc. or its affiliates.
+
+This repository does not bundle text authored by AWS: the Well-Architected lens
+(questions and best practices) is fetched at run time from the user's own
+AWS Well-Architected Tool. Test fixtures are synthetic.

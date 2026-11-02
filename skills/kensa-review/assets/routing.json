@@ -1,0 +1,2350 @@
+{
+ "_doc": "Evidence routing per QuestionId (default) and per ChoiceId (override). ch: first = primary. areas = join key to scan checks (references/aws-readonly-checks.md, references/repo-signals.md). card = interview decision card (assets/cards.json). Items containing 'interview' must have a card. draft = the evidence is only a draft and a person confirms it in the interview. vocab is the vocabulary for classifying the items of a new lens.",
+ "version": 3,
+ "fallback": {
+  "ch": [
+   "interview"
+  ],
+  "areas": [],
+  "card": null
+ },
+ "questions": {
+  "cloud-financial-management": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "cost"
+   ]
+  },
+  "govern-usage": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "org",
+    "iam",
+    "cost"
+   ]
+  },
+  "monitor-usage": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "cost"
+   ]
+  },
+  "decomissioning-resources": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "cost",
+    "compute"
+   ]
+  },
+  "select-service": {
+   "ch": [
+    "interview"
+   ],
+   "areas": []
+  },
+  "type-size-number-resources": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "cost",
+    "compute"
+   ]
+  },
+  "pricing-model": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "cost"
+   ]
+  },
+  "data-transfer": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "network",
+    "cost"
+   ]
+  },
+  "manage-demand-resources": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "scaling",
+    "cost"
+   ]
+  },
+  "evaluate-new-services": {
+   "ch": [
+    "interview"
+   ],
+   "areas": []
+  },
+  "evaluate-cost-effort": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "iac-aws"
+   ]
+  },
+  "priorities": {
+   "ch": [
+    "interview"
+   ],
+   "areas": []
+  },
+  "ops-model": {
+   "ch": [
+    "interview"
+   ],
+   "areas": []
+  },
+  "org-culture": {
+   "ch": [
+    "interview"
+   ],
+   "areas": []
+  },
+  "observability": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "observability"
+   ]
+  },
+  "dev-integ": {
+   "ch": [
+    "repo"
+   ],
+   "areas": [
+    "ci",
+    "iac",
+    "tests"
+   ]
+  },
+  "mit-deploy-risks": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "ci",
+    "compute"
+   ]
+  },
+  "ready-to-support": {
+   "ch": [
+    "interview"
+   ],
+   "areas": []
+  },
+  "workload-observability": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "observability"
+   ]
+  },
+  "operations-health": {
+   "ch": [
+    "interview"
+   ],
+   "areas": []
+  },
+  "event-response": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "observability"
+   ]
+  },
+  "evolve-ops": {
+   "ch": [
+    "interview"
+   ],
+   "areas": []
+  },
+  "performing-architecture": {
+   "ch": [
+    "interview"
+   ],
+   "areas": []
+  },
+  "compute-hardware": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "compute",
+    "scaling"
+   ]
+  },
+  "data-management": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "db"
+   ]
+  },
+  "networking": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "network",
+    "tls"
+   ]
+  },
+  "process-culture": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "observability"
+   ]
+  },
+  "manage-service-limits": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "quotas"
+   ]
+  },
+  "planning-network-topology": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "network"
+   ]
+  },
+  "service-architecture": {
+   "ch": [
+    "interview"
+   ],
+   "areas": []
+  },
+  "prevent-interaction-failure": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "compute"
+   ]
+  },
+  "mitigate-interaction-failure": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "network",
+    "waf"
+   ]
+  },
+  "monitor-aws-resources": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "observability"
+   ]
+  },
+  "adapt-to-changes": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "scaling"
+   ]
+  },
+  "tracking-change-management": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "iac-aws",
+    "ci"
+   ]
+  },
+  "backing-up-data": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "backup",
+    "db",
+    "s3"
+   ]
+  },
+  "fault-isolation": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "multi-az"
+   ]
+  },
+  "withstand-component-failures": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "multi-az",
+    "observability"
+   ]
+  },
+  "testing-resiliency": {
+   "ch": [
+    "interview"
+   ],
+   "areas": []
+  },
+  "planning-for-recovery": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "backup",
+    "multi-az"
+   ]
+  },
+  "securely-operate": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "org",
+    "root",
+    "config",
+    "threat-detect"
+   ]
+  },
+  "identities": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "iam",
+    "root"
+   ]
+  },
+  "permissions": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "iam",
+    "threat-detect"
+   ]
+  },
+  "detect-investigate-events": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "cloudtrail",
+    "config",
+    "threat-detect"
+   ]
+  },
+  "network-protection": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "network",
+    "waf"
+   ]
+  },
+  "protect-compute": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "compute",
+    "threat-detect"
+   ]
+  },
+  "data-classification": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [
+    "s3",
+    "db"
+   ]
+  },
+  "protect-data-rest": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "kms",
+    "s3",
+    "db"
+   ]
+  },
+  "protect-data-transit": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "tls"
+   ]
+  },
+  "incident-response": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "threat-detect",
+    "cloudtrail"
+   ]
+  },
+  "application-security": {
+   "ch": [
+    "repo"
+   ],
+   "areas": [
+    "ci"
+   ]
+  },
+  "sus_region": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "org"
+   ]
+  },
+  "sus_user": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "scaling"
+   ]
+  },
+  "sus_software": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "compute"
+   ]
+  },
+  "sus_data": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "s3",
+    "db",
+    "backup"
+   ]
+  },
+  "sus_hardware": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "compute"
+   ]
+  },
+  "sus_dev": {
+   "ch": [
+    "repo"
+   ],
+   "areas": [
+    "ci",
+    "iac"
+   ]
+  }
+ },
+ "choices": {
+  "cost_cloud_financial_management_function": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "cost"
+   ],
+   "draft": true,
+   "card": "C-COST-OWNERSHIP"
+  },
+  "cost_cloud_financial_management_partnership": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-COST-OWNERSHIP"
+  },
+  "cost_cloud_financial_management_quantify_value": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-COST-OWNERSHIP"
+  },
+  "cost_monitor_usage_define_kpi": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "cost"
+   ],
+   "draft": true,
+   "card": "C-COST-OWNERSHIP"
+  },
+  "cost_govern_usage_goal_target": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "cost"
+   ],
+   "card": "C-COST-OWNERSHIP"
+  },
+  "cost_monitor_usage_define_attribution": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "cost"
+   ],
+   "card": "C-COST-OWNERSHIP"
+  },
+  "cost_cloud_financial_management_cost_awareness": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ci"
+   ],
+   "draft": true,
+   "card": "C-COST-CULTURE"
+  },
+  "cost_cloud_financial_management_culture": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-COST-CULTURE"
+  },
+  "cost_govern_usage_policies": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "org",
+    "cost"
+   ],
+   "card": "C-COST-CULTURE"
+  },
+  "cost_govern_usage_track_lifecycle": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "cost"
+   ],
+   "card": "C-COST-CULTURE"
+  },
+  "cost_decomissioning_resources_implement_process": {
+   "ch": [
+    "aws",
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "cost",
+    "compute",
+    "iac"
+   ],
+   "card": "C-COST-CULTURE"
+  },
+  "cost_select_service_requirements": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-COST-DESIGN"
+  },
+  "cost_select_service_analyze_all": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-COST-DESIGN"
+  },
+  "cost_select_service_thorough_analysis": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-COST-DESIGN"
+  },
+  "cost_select_service_select_for_cost": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-COST-DESIGN"
+  },
+  "cost_select_service_analyze_over_time": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-COST-DESIGN"
+  },
+  "cost_type_size_number_resources_cost_modeling": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ci"
+   ],
+   "draft": true,
+   "card": "C-COST-DESIGN"
+  },
+  "cost_pricing_model_third_party": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-COST-DESIGN"
+  },
+  "cost_select_service_licensing": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "compute",
+    "db"
+   ],
+   "card": "C-COST-DESIGN"
+  },
+  "cost_type_size_number_resources_shared": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "compute"
+   ],
+   "card": "C-COST-DESIGN"
+  },
+  "cost_manage_demand_resources_cost_analysis": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "scaling",
+    "observability"
+   ],
+   "card": "C-COST-DESIGN"
+  },
+  "cost_cloud_financial_management_scheduled": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-ARCH-REVIEW"
+  },
+  "cost_evaluate_new_services_review_process": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-ARCH-REVIEW"
+  },
+  "cost_evaluate_new_services_review_workload": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-ARCH-REVIEW"
+  },
+  "sec_securely_operate_implement_services_features": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-ARCH-REVIEW"
+  },
+  "perf_architecture_understand_cloud_services_and_features": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-ARCH-REVIEW"
+  },
+  "perf_architecture_guidance_architecture_patterns_best_practices": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "support"
+   ],
+   "draft": true,
+   "card": "C-ARCH-REVIEW"
+  },
+  "perf_process_culture_workload_performance": {
+   "ch": [
+    "aws",
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "observability",
+    "loadtest"
+   ],
+   "draft": true,
+   "card": "C-ARCH-REVIEW"
+  },
+  "perf_process_culture_keep_workload_and_services_up_to_date": {
+   "ch": [
+    "repo",
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "deps",
+    "compute"
+   ],
+   "card": "C-ARCH-REVIEW"
+  },
+  "ops_priorities_ext_cust_needs": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-PRIORITIES"
+  },
+  "ops_priorities_int_cust_needs": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-PRIORITIES"
+  },
+  "ops_priorities_eval_tradeoffs": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-PRIORITIES"
+  },
+  "ops_observability_identify_kpis": {
+   "ch": [
+    "aws",
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "observability",
+    "iac"
+   ],
+   "draft": true,
+   "card": "C-OPS-PRIORITIES"
+  },
+  "ops_priorities_governance_reqs": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-COMPLIANCE"
+  },
+  "ops_priorities_compliance_reqs": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-COMPLIANCE"
+  },
+  "ops_priorities_eval_threat_landscape": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-SEC-THREAT"
+  },
+  "sec_securely_operate_threat_model": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-SEC-THREAT"
+  },
+  "ops_ops_model_def_proc_owners": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "review",
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-OPS-OWNERSHIP"
+  },
+  "ops_ops_model_def_activity_owners": {
+   "ch": [
+    "repo",
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "review",
+    "docs",
+    "cost"
+   ],
+   "draft": true,
+   "card": "C-OPS-OWNERSHIP"
+  },
+  "ops_ops_model_def_responsibilities_ownership": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "review",
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-OPS-OWNERSHIP"
+  },
+  "ops_ops_model_req_add_chg_exception": {
+   "ch": [
+    "repo",
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "review",
+    "ci",
+    "ops-process"
+   ],
+   "draft": true,
+   "card": "C-OPS-OWNERSHIP"
+  },
+  "ops_ops_model_def_neg_team_agreements": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-OPS-OWNERSHIP"
+  },
+  "ops_ops_model_def_resource_owners": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "cost"
+   ],
+   "card": "C-OPS-OWNERSHIP"
+  },
+  "ops_org_culture_executive_sponsor": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-CULTURE"
+  },
+  "ops_org_culture_team_enc_escalation": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-CULTURE"
+  },
+  "ops_org_culture_effective_comms": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-CULTURE"
+  },
+  "ops_org_culture_team_emp_take_action": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-CULTURE"
+  },
+  "ops_org_culture_team_res_appro": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-CULTURE"
+  },
+  "ops_org_culture_team_enc_experiment": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-LEARNING"
+  },
+  "ops_org_culture_team_enc_learn": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-LEARNING"
+  },
+  "ops_ready_to_support_personnel_capability": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-LEARNING"
+  },
+  "ops_dev_integ_share_design_stds": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "card": "C-DEV-PROCESS"
+  },
+  "ops_dev_integ_code_quality": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ci",
+    "review",
+    "tests"
+   ],
+   "card": "C-DEV-PROCESS"
+  },
+  "ops_dev_integ_freq_sm_rev_chg": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ci",
+    "review"
+   ],
+   "card": "C-DEV-PROCESS"
+  },
+  "ops_mit_deploy_risks_plan_for_unsucessful_changes": {
+   "ch": [
+    "repo",
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "ci",
+    "compute",
+    "docs"
+   ],
+   "card": "C-OPS-ORR"
+  },
+  "ops_ready_to_support_const_orr": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-OPS-ORR"
+  },
+  "ops_ready_to_support_informed_deploy_decisions": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ci",
+    "docs"
+   ],
+   "card": "C-OPS-ORR"
+  },
+  "ops_ready_to_support_use_runbooks": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "card": "C-OPS-RUNBOOKS"
+  },
+  "ops_ready_to_support_use_playbooks": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "card": "C-OPS-RUNBOOKS"
+  },
+  "rel_tracking_change_management_planned_changemgmt": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "card": "C-OPS-RUNBOOKS"
+  },
+  "rel_testing_resiliency_playbook_resiliency": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "card": "C-OPS-RUNBOOKS"
+  },
+  "sec_incident_response_playbooks": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "card": "C-OPS-RUNBOOKS"
+  },
+  "ops_event_response_process_per_alert": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "observability",
+    "docs"
+   ],
+   "card": "C-OPS-RUNBOOKS"
+  },
+  "ops_ready_to_support_enable_support_plans": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "support"
+   ],
+   "card": "C-OPS-SUPPORT-PLAN"
+  },
+  "ops_operations_health_measure_ops_goals_kpis": {
+   "ch": [
+    "aws",
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "observability",
+    "slo",
+    "iac"
+   ],
+   "draft": true,
+   "card": "C-OPS-HEALTH-REVIEW"
+  },
+  "ops_operations_health_communicate_status_trends": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-HEALTH-REVIEW"
+  },
+  "ops_operations_health_review_ops_metrics_prioritize_improvement": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "gh-activity"
+   ],
+   "draft": true,
+   "card": "C-OPS-HEALTH-REVIEW"
+  },
+  "ops_evolve_ops_metrics_review": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-HEALTH-REVIEW"
+  },
+  "rel_monitor_aws_resources_review_monitoring": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-HEALTH-REVIEW"
+  },
+  "ops_event_response_event_incident_problem_process": {
+   "ch": [
+    "aws",
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ops-process",
+    "docs",
+    "gh-activity"
+   ],
+   "draft": true,
+   "card": "C-OPS-INCIDENT"
+  },
+  "ops_event_response_prioritize_events": {
+   "ch": [
+    "aws",
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ops-process",
+    "gh-activity"
+   ],
+   "draft": true,
+   "card": "C-OPS-INCIDENT"
+  },
+  "ops_event_response_define_escalation_paths": {
+   "ch": [
+    "aws",
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ops-process",
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-OPS-INCIDENT"
+  },
+  "ops_event_response_push_notify": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-OPS-INCIDENT"
+  },
+  "ops_evolve_ops_perform_rca_process": {
+   "ch": [
+    "aws",
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ops-process",
+    "docs",
+    "gh-activity"
+   ],
+   "draft": true,
+   "card": "C-OPS-POSTMORTEM"
+  },
+  "ops_evolve_ops_validate_insights": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-POSTMORTEM"
+  },
+  "ops_evolve_ops_share_lessons_learned": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-OPS-POSTMORTEM"
+  },
+  "rel_testing_resiliency_rca_resiliency": {
+   "ch": [
+    "aws",
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ops-process",
+    "docs",
+    "gh-activity"
+   ],
+   "draft": true,
+   "card": "C-OPS-POSTMORTEM"
+  },
+  "sec_incident_response_establish_incident_framework": {
+   "ch": [
+    "aws",
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ops-process",
+    "docs",
+    "gh-activity"
+   ],
+   "draft": true,
+   "card": "C-OPS-POSTMORTEM"
+  },
+  "ops_evolve_ops_knowledge_management": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "card": "C-OPS-POSTMORTEM"
+  },
+  "ops_evolve_ops_process_cont_imp": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "gh-activity"
+   ],
+   "draft": true,
+   "card": "C-OPS-IMPROVEMENT"
+  },
+  "ops_evolve_ops_feedback_loops": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "gh-activity"
+   ],
+   "draft": true,
+   "card": "C-OPS-IMPROVEMENT"
+  },
+  "ops_evolve_ops_drivers_for_imp": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-IMPROVEMENT"
+  },
+  "ops_evolve_ops_allocate_time_for_imp": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "gh-activity"
+   ],
+   "draft": true,
+   "card": "C-OPS-IMPROVEMENT"
+  },
+  "perf_architecture_evaluate_trade_offs": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-ARCH-DECISIONS"
+  },
+  "perf_architecture_factor_cost_into_architectural_decisions": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs",
+    "ci"
+   ],
+   "draft": true,
+   "card": "C-ARCH-DECISIONS"
+  },
+  "perf_compute_hardware_understand_compute_configuration_features": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-ARCH-DECISIONS"
+  },
+  "perf_architecture_use_benchmarking": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "loadtest"
+   ],
+   "card": "C-ARCH-DECISIONS"
+  },
+  "perf_architecture_use_data_driven_approach": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "observability"
+   ],
+   "card": "C-ARCH-DECISIONS"
+  },
+  "perf_compute_hardware_select_best_compute_options": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "compute"
+   ],
+   "card": "C-ARCH-DECISIONS"
+  },
+  "perf_data_use_purpose_built_data_store": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "db"
+   ],
+   "card": "C-ARCH-DECISIONS"
+  },
+  "perf_networking_understand_how_networking_impacts_performance": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "network",
+    "tls"
+   ],
+   "card": "C-ARCH-DECISIONS"
+  },
+  "perf_architecture_use_policies_and_reference_architectures": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs",
+    "iac"
+   ],
+   "card": "C-DEV-PROCESS"
+  },
+  "rel_service_architecture_monolith_soa_microservice": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-ARCH-STYLE"
+  },
+  "rel_service_architecture_business_domains": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-ARCH-STYLE"
+  },
+  "rel_fault_isolation_use_bulkhead": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "multi-az",
+    "compute"
+   ],
+   "card": "C-ARCH-STYLE"
+  },
+  "rel_prevent_interaction_failure_identify": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-REL-DEPENDENCIES"
+  },
+  "rel_prevent_interaction_failure_constant_work": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-REL-DEPENDENCIES"
+  },
+  "rel_prevent_interaction_failure_idempotent": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "card": "C-REL-DEPENDENCIES"
+  },
+  "rel_mitigate_interaction_failure_graceful_degradation": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "card": "C-REL-DEPENDENCIES"
+  },
+  "rel_mitigate_interaction_failure_emergency_levers": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "card": "C-REL-DEPENDENCIES"
+  },
+  "rel_adapt_to_changes_load_tested_adapt": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "loadtest",
+    "ci"
+   ],
+   "card": "C-REL-TESTING"
+  },
+  "rel_testing_resiliency_test_non_functional": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "loadtest",
+    "ci"
+   ],
+   "card": "C-REL-TESTING"
+  },
+  "rel_tracking_change_management_functional_testing": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ci",
+    "tests"
+   ],
+   "card": "C-REL-TESTING"
+  },
+  "rel_tracking_change_management_resiliency_testing": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ci",
+    "tests"
+   ],
+   "card": "C-REL-TESTING"
+  },
+  "rel_testing_resiliency_failure_injection_resiliency": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "compute"
+   ],
+   "card": "C-REL-TESTING"
+  },
+  "rel_testing_resiliency_game_days_resiliency": {
+   "ch": [
+    "aws",
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "resilience",
+    "iac",
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-REL-TESTING"
+  },
+  "rel_withstand_component_failures_avoid_control_plane": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "multi-az",
+    "scaling"
+   ],
+   "card": "C-REL-SLO"
+  },
+  "rel_withstand_component_failures_service_level_agreements": {
+   "ch": [
+    "aws",
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "slo",
+    "multi-az",
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-REL-SLO"
+  },
+  "rel_planning_for_recovery_objective_defined_recovery": {
+   "ch": [
+    "aws",
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "resilience",
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-REL-RTO-RPO"
+  },
+  "rel_planning_for_recovery_dr_tested": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "backup"
+   ],
+   "card": "C-REL-RTO-RPO"
+  },
+  "sec_permissions_share_securely_third_party": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "iam"
+   ],
+   "card": "C-SEC-3P-SHARING"
+  },
+  "sec_data_classification_identify_data": {
+   "ch": [
+    "aws",
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "s3",
+    "docs",
+    "cost"
+   ],
+   "draft": true,
+   "card": "C-SEC-DATA-CLASS"
+  },
+  "sec_data_classification_define_protection": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "s3",
+    "db",
+    "kms"
+   ],
+   "card": "C-SEC-DATA-CLASS"
+  },
+  "sec_data_classification_lifecycle_management": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "s3"
+   ],
+   "card": "C-SEC-DATA-CLASS"
+  },
+  "sec_data_classification_auto_classification": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "threat-detect",
+    "s3"
+   ],
+   "card": "C-SEC-DATA-CLASS"
+  },
+  "sec_incident_response_prepare_forensic": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "compute",
+    "cloudtrail"
+   ],
+   "card": "C-SEC-FORENSIC"
+  },
+  "sec_appsec_perform_regular_penetration_testing": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ci",
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-SEC-APPSEC"
+  },
+  "sec_appsec_train_for_application_security": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "secscan",
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-SEC-APPSEC"
+  },
+  "sec_appsec_build_program_that_embeds_security_ownership_in_teams": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "review",
+    "secscan",
+    "ci"
+   ],
+   "draft": true,
+   "card": "C-SEC-APPSEC"
+  },
+  "sec_appsec_deploy_software_programmatically": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ci",
+    "iac"
+   ],
+   "card": "C-DEV-PROCESS"
+  },
+  "sec_appsec_regularly_assess_security_properties_of_pipelines": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ci",
+    "secscan",
+    "review"
+   ],
+   "card": "C-DEV-PROCESS"
+  },
+  "sec_appsec_automate_testing_throughout_lifecycle": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "ci",
+    "secscan",
+    "tests",
+    "deps"
+   ],
+   "card": "C-DEV-PROCESS"
+  },
+  "sec_appsec_manual_code_reviews": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "review"
+   ],
+   "card": "C-DEV-PROCESS"
+  },
+  "sec_appsec_centralize_services_for_packages_and_dependencies": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "deps"
+   ],
+   "card": "C-DEV-PROCESS"
+  },
+  "sec_securely_operate_reduce_management_scope": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "compute",
+    "db"
+   ],
+   "card": null
+  },
+  "sec_securely_operate_automate_security_controls": {
+   "ch": [
+    "aws",
+    "repo"
+   ],
+   "areas": [
+    "iac",
+    "config",
+    "iac-aws"
+   ],
+   "card": null
+  },
+  "sec_identities_secrets": {
+   "ch": [
+    "aws",
+    "repo"
+   ],
+   "areas": [
+    "secrets",
+    "secscan"
+   ],
+   "card": null
+  },
+  "sec_identities_groups_attributes": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "iam"
+   ],
+   "card": null
+  },
+  "sec_detect_investigate_events_app_service_logging": {
+   "ch": [
+    "aws",
+    "repo"
+   ],
+   "areas": [
+    "cloudtrail",
+    "observability",
+    "network"
+   ],
+   "card": null
+  },
+  "sec_detect_investigate_events_logs": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "cloudtrail",
+    "observability"
+   ],
+   "card": null
+  },
+  "sec_detect_investigate_events_noncompliant_resources": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "config",
+    "threat-detect"
+   ],
+   "card": null
+  },
+  "sec_detect_investigate_events_security_alerts": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "threat-detect",
+    "observability"
+   ],
+   "card": null
+  },
+  "sec_network_protection_create_layers": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "network"
+   ],
+   "card": null
+  },
+  "sec_network_protection_layered": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "network"
+   ],
+   "card": null
+  },
+  "sec_network_protection_inspection": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "waf",
+    "network"
+   ],
+   "card": null
+  },
+  "sec_network_protection_auto_protect": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "waf",
+    "network"
+   ],
+   "card": null
+  },
+  "sec_protect_compute_hardened_images": {
+   "ch": [
+    "aws",
+    "repo"
+   ],
+   "areas": [
+    "compute",
+    "container"
+   ],
+   "card": null
+  },
+  "sec_protect_compute_reduce_manual_management": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "compute",
+    "network"
+   ],
+   "card": null
+  },
+  "sec_protect_compute_auto_protection": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "threat-detect",
+    "compute"
+   ],
+   "card": null
+  },
+  "sec_protect_data_rest_key_mgmt": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "kms"
+   ],
+   "card": null
+  },
+  "sec_protect_data_rest_encrypt": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "s3",
+    "db",
+    "kms"
+   ],
+   "card": null
+  },
+  "sec_protect_data_rest_automate_protection": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "config",
+    "s3",
+    "db"
+   ],
+   "card": null
+  },
+  "sec_protect_data_rest_access_control": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "s3",
+    "db",
+    "iam"
+   ],
+   "card": null
+  },
+  "sec_protect_data_transit_key_cert_mgmt": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "tls"
+   ],
+   "card": null
+  },
+  "sec_protect_data_transit_encrypt": {
+   "ch": [
+    "aws"
+   ],
+   "areas": [
+    "tls",
+    "db"
+   ],
+   "card": null
+  },
+  "sec_protect_data_transit_authentication": {
+   "ch": [
+    "aws",
+    "repo"
+   ],
+   "areas": [
+    "tls",
+    "network"
+   ],
+   "card": null
+  },
+  "sus_sus_dev_a1": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "draft": true,
+   "card": "C-SUS-GOALS"
+  },
+  "sus_sus_user_a6": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-SUS-GOALS"
+  },
+  "sus_sus_software_a5": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-SUS-GOALS"
+  },
+  "sus_sus_user_a5": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "network",
+    "org"
+   ],
+   "card": "C-SUS-GOALS"
+  },
+  "sus_sus_user_a7": {
+   "ch": [
+    "aws",
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "scaling",
+    "waf"
+   ],
+   "card": "C-SUS-GOALS"
+  },
+  "sus_sus_software_a4": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "observability",
+    "compute"
+   ],
+   "card": "C-SUS-GOALS"
+  },
+  "sus_sus_hardware_a4": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "compute",
+    "db"
+   ],
+   "card": "C-SUS-GOALS"
+  },
+  "sus_sus_hardware_a5": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "compute"
+   ],
+   "card": "C-SUS-GOALS"
+  },
+  "sus_sus_software_a6": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "db"
+   ],
+   "card": "C-SUS-DATA"
+  },
+  "sus_sus_data_a7": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "s3"
+   ],
+   "card": "C-SUS-DATA"
+  },
+  "sus_sus_data_a8": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "network"
+   ],
+   "card": "C-SUS-DATA"
+  },
+  "sus_sus_data_a9": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "backup"
+   ],
+   "card": "C-SUS-DATA"
+  },
+  "ops_dev_integ_test_val_chg": {
+   "ch": [
+    "repo",
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "ci",
+    "tests"
+   ],
+   "card": "C-DEV-PROCESS"
+  },
+  "ops_dev_integ_build_mgmt_sys": {
+   "ch": [
+    "repo",
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "ci"
+   ],
+   "card": "C-DEV-PROCESS"
+  },
+  "ops_mit_deploy_risks_test_val_chg": {
+   "ch": [
+    "repo",
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "ci"
+   ],
+   "card": "C-DEV-PROCESS"
+  },
+  "ops_dev_integ_auto_integ_deploy": {
+   "ch": [
+    "repo",
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "ci",
+    "iac-aws"
+   ],
+   "card": "C-DEV-PROCESS"
+  },
+  "rel_backing_up_data_periodic_recovery_testing_data": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "backup"
+   ],
+   "card": "C-REL-RTO-RPO"
+  },
+  "rel_mitigate_interaction_failure_limit_retries": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "card": "C-REL-DEPENDENCIES"
+  },
+  "rel_mitigate_interaction_failure_fail_fast": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "card": "C-REL-DEPENDENCIES"
+  },
+  "rel_service_architecture_api_contracts": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "docs"
+   ],
+   "card": "C-ARCH-STYLE"
+  },
+  "perf_process_culture_review_metrics": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-OPS-HEALTH-REVIEW"
+  },
+  "perf_process_culture_load_test": {
+   "ch": [
+    "repo",
+    "interview"
+   ],
+   "areas": [
+    "loadtest"
+   ],
+   "card": "C-REL-TESTING"
+  },
+  "sec_incident_response_run_game_days": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-REL-TESTING"
+  },
+  "sec_permissions_emergency_process": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "iam"
+   ],
+   "card": "C-SEC-FORENSIC"
+  },
+  "sec_incident_response_develop_management_plans": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "observability"
+   ],
+   "card": "C-OPS-INCIDENT"
+  },
+  "sus_sus_user_a3": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-SUS-GOALS"
+  },
+  "sus_sus_dev_a4": {
+   "ch": [
+    "interview"
+   ],
+   "areas": [],
+   "card": "C-SUS-GOALS"
+  },
+  "perf_data_implement_strategies_to_improve_query_performance": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "db"
+   ],
+   "card": "C-ARCH-DECISIONS"
+  },
+  "cost_monitor_usage_detailed_source": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "cost"
+   ],
+   "card": "C-COST-OWNERSHIP"
+  },
+  "cost_pricing_model_master_analysis": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "cost",
+    "org"
+   ],
+   "card": "C-COST-DESIGN"
+  },
+  "cost_govern_usage_controls": {
+   "ch": [
+    "aws",
+    "interview"
+   ],
+   "areas": [
+    "org",
+    "cost"
+   ],
+   "card": "C-COST-CULTURE"
+  }
+ },
+ "vocab": {
+  "channels": {
+   "aws": "Live AWS environment settings (read-only scan). Both presence and absence can be grounds for a verdict (unless the route is draft)",
+   "repo": "Repository (IaC, CI, documents) and GitHub settings and activity",
+   "interview": "Decision card (a person's answer). The last resort; always put it last"
+  },
+  "draft": "A route with draft: true leaves the evidence at draft level (existence or activity can be confirmed, but a person confirms it on the decision card). Absence is not grounds for ✗",
+  "areas": {
+   "iam": "IAM and identity",
+   "root": "Root user",
+   "org": "Organizations/SCP",
+   "cloudtrail": "CloudTrail",
+   "config": "AWS Config",
+   "threat-detect": "GuardDuty/Security Hub/Inspector/Access Analyzer",
+   "kms": "KMS encryption",
+   "secrets": "Secrets Manager",
+   "tls": "TLS / certificates",
+   "network": "VPC and security groups",
+   "waf": "WAF / CDN",
+   "s3": "S3 and data protection",
+   "db": "Databases",
+   "backup": "Backups",
+   "multi-az": "Multi-AZ and redundancy",
+   "compute": "EC2 / ECS / Lambda, etc.",
+   "container": "Containers",
+   "scaling": "Auto scaling",
+   "quotas": "Service quotas",
+   "observability": "CloudWatch: logs, traces, dashboards",
+   "iac-aws": "Live-environment side of CloudFormation, etc.",
+   "cost": "Billing, budgets, tags, purchase options",
+   "support": "Support plan",
+   "resilience": "Resilience Hub / FIS (game days)",
+   "ops-process": "SSM Incident Manager, Contacts, OpsCenter, Change Manager",
+   "slo": "Application Signals SLOs",
+   "iac": "IaC",
+   "ci": "CI/CD",
+   "tests": "Tests",
+   "deps": "Dependency management",
+   "secscan": "Security scanning",
+   "review": "Review, CODEOWNERS, templates",
+   "docs": "Documents (runbooks, ADRs, post-mortems, threat models, DR plans, SLOs, ORR, etc.)",
+   "loadtest": "Load testing",
+   "gh-activity": "GitHub activity (releases, deployments, labeled issues, PRs)"
+  },
+  "area_scope": {
+   "iam": "aws",
+   "root": "aws",
+   "org": "aws",
+   "cloudtrail": "aws",
+   "config": "aws",
+   "threat-detect": "aws",
+   "kms": "aws",
+   "secrets": "aws",
+   "tls": "aws",
+   "network": "aws",
+   "waf": "aws",
+   "s3": "aws",
+   "db": "aws",
+   "backup": "aws",
+   "multi-az": "aws",
+   "compute": "aws",
+   "container": "aws",
+   "scaling": "aws",
+   "quotas": "aws",
+   "observability": "aws",
+   "iac-aws": "aws",
+   "cost": "aws",
+   "support": "aws",
+   "resilience": "aws",
+   "ops-process": "aws",
+   "slo": "aws",
+   "iac": "repo",
+   "ci": "repo",
+   "tests": "repo",
+   "deps": "repo",
+   "secscan": "repo",
+   "review": "repo",
+   "docs": "repo",
+   "loadtest": "repo",
+   "gh-activity": "repo"
+  }
+ }
+}

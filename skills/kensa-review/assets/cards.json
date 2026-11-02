@@ -1,0 +1,1376 @@
+{
+ "_doc": "Interview decision cards. Business cards (Phase 0) set context; item cards fill unresolved checklist items. ladder: full=○ partial=△ none=✗ (na only if na_ok). Placeholders are filled from context.json. English is the default locale; cards.ja.json holds the Japanese text.",
+ "version": 1,
+ "business": [
+  {
+   "id": "B-CRITICALITY",
+   "title": "Service criticality (impact when it goes down)",
+   "sets": "business.criticality",
+   "ask": "If '{service}' goes down, how serious is the impact on customers, users and the business?",
+   "options": [
+    {
+     "key": "critical",
+     "label": "critical: an outage hits revenue or contracts directly and stops customers' work (impact within minutes)"
+    },
+    {
+     "key": "high",
+     "label": "high: customers' work is disrupted. A few hours is tolerable; half a day or more damages trust"
+    },
+    {
+     "key": "standard",
+     "label": "standard: little impact outside business hours. Recovery by the next business day is acceptable"
+    },
+    {
+     "key": "low",
+     "label": "low: internal, experimental or beta. An outage has no major impact"
+    }
+   ],
+   "recommend": "high",
+   "why": "There are paying B2B customers, and an outage affects their operations. Demanding 'critical' at an early stage makes costs jump.",
+   "implies": "Changes the recommended levels for RTO/RPO, Multi-AZ, DR, and monitoring/on-call."
+  },
+  {
+   "id": "B-AVAILABILITY",
+   "title": "Availability target",
+   "sets": "business.availability_target",
+   "ask": "Which uptime target is closest to what you are aiming for? (Each option shows the monthly downtime it allows.)",
+   "options": [
+    {
+     "key": "99.0",
+     "label": "99.0% (about 7.3 hours per month)"
+    },
+    {
+     "key": "99.5",
+     "label": "99.5% (about 3.6 hours per month)"
+    },
+    {
+     "key": "99.9",
+     "label": "99.9% (about 43 minutes per month)"
+    },
+    {
+     "key": "99.95",
+     "label": "99.95% or higher (about 22 minutes or less per month)"
+    }
+   ],
+   "recommend": "99.9",
+   "why": "A common starting point for B2B SaaS, and realistically reachable with Multi-AZ plus automated recovery.",
+   "implies": "Multi-AZ design, deployment method, how strict change management is, and whether you can offer an SLA."
+  },
+  {
+   "id": "B-DATA",
+   "title": "Sensitivity of the data you handle",
+   "sets": "business.data_sensitivity",
+   "ask": "Which kinds of data does the service hold? (multiple choices allowed)",
+   "options": [
+    {
+     "key": "pii_basic",
+     "label": "Personal information (name, contact details, email)"
+    },
+    {
+     "key": "pii_profile",
+     "label": "Detailed information tied to an individual, such as work history, submitted documents and message bodies"
+    },
+    {
+     "key": "sensitive",
+     "label": "May include special care-required personal information (medical history, beliefs, criminal record, etc.)"
+    },
+    {
+     "key": "payment",
+     "label": "Holds payment data (card numbers, etc.) in-house"
+    },
+    {
+     "key": "none",
+     "label": "Does not handle personal information"
+    }
+   ],
+   "recommend": "pii_profile",
+   "why": "Many services hold detailed per-user information (work history, submitted documents, messages). Payment data is best left with an external payment provider (tokenized) rather than stored in-house.",
+   "implies": "Priority of encryption, key management, access auditing and retention/deletion, and the answers on the data classification card."
+  },
+  {
+   "id": "B-COMPLIANCE",
+   "title": "Regulations and certifications to comply with",
+   "sets": "business.compliance",
+   "ask": "Which regulations, certifications or standards do you comply with (or plan to obtain)? (multiple choices allowed)",
+   "options": [
+    {
+     "key": "appi",
+     "label": "Japan's Act on the Protection of Personal Information (mandatory)"
+    },
+    {
+     "key": "isms",
+     "label": "ISMS (ISO 27001) / PrivacyMark"
+    },
+    {
+     "key": "soc2",
+     "label": "SOC 2"
+    },
+    {
+     "key": "ftr",
+     "label": "AWS FTR / AWS Partner (Marketplace listing)"
+    },
+    {
+     "key": "customer",
+     "label": "Only answering customers' security questionnaires"
+    }
+   ],
+   "recommend": "appi",
+   "why": "First get legal compliance and customer requirements covered. Pursue certifications step by step, in line with the business plan.",
+   "implies": "If FTR is chosen, having zero HRIs (HRI=0) in Security, Operational Excellence and Reliability becomes a hard requirement and priorities shift."
+  },
+  {
+   "id": "B-TRAFFIC",
+   "title": "Traffic pattern",
+   "sets": "business.traffic",
+   "ask": "Which usage pattern is closest to yours?",
+   "options": [
+    {
+     "key": "steady",
+     "label": "Roughly constant"
+    },
+    {
+     "key": "business_hours",
+     "label": "Concentrated on weekday daytime"
+    },
+    {
+     "key": "spiky",
+     "label": "Sudden surges, for example from campaigns or mass notifications"
+    },
+    {
+     "key": "unknown",
+     "label": "Not known yet"
+    }
+   ],
+   "recommend": "business_hours",
+   "why": "B2B services tend to peak on weekday daytime. Scaling down at night and on holidays can cut costs.",
+   "implies": "Targets for autoscaling, queues (buffering), night-time scale-down and load testing."
+  },
+  {
+   "id": "B-BUDGET",
+   "title": "Cost sensitivity",
+   "sets": "business.budget_sensitivity",
+   "ask": "How tight is your AWS cost constraint?",
+   "options": [
+    {
+     "key": "strict",
+     "label": "Tight (there is a monthly cap, and any increase needs approval)"
+    },
+    {
+     "key": "moderate",
+     "label": "Moderate (investing in reliability is fine; waste should be cut)"
+    },
+    {
+     "key": "flexible",
+     "label": "Relaxed (reliability and security come first)"
+    }
+   ],
+   "recommend": "moderate",
+   "why": "For a startup, balancing reliability against cost matters. The basic policy is 'start small, measure, and scale up when needed'.",
+   "implies": "How far to adopt recommendations that raise cost, such as Multi-AZ, DR and monitoring tools."
+  },
+  {
+   "id": "B-ENVS",
+   "title": "Environments and AWS account structure",
+   "sets": "aws.environments",
+   "ask": "Which setup is closest to your environments (production / staging / development) and AWS accounts?",
+   "options": [
+    {
+     "key": "single_account_prod_only",
+     "label": "One account, production only"
+    },
+    {
+     "key": "single_account_multi_env",
+     "label": "Production and staging share one account"
+    },
+    {
+     "key": "multi_account",
+     "label": "Production and non-production are in separate accounts (Organizations)"
+    }
+   ],
+   "recommend": "multi_account",
+   "why": "Production and staging can be kept apart in permissions, cost and failures, which also helps with security requirements. AWS Organizations is available at no extra charge.",
+   "implies": "How to evaluate the account structure, guardrails (SCPs), cost allocation and permission design."
+  },
+  {
+   "id": "B-INTEGRATIONS",
+   "title": "External service integrations",
+   "sets": "business.integrations",
+   "ask": "Which external services do you depend on? (e.g. email delivery, payments, SSO, chat, other third-party integrations)",
+   "options": [
+    {
+     "key": "free_text",
+     "label": "Free text (service names and what each is used for)"
+    }
+   ],
+   "recommend": "free_text",
+   "why": "Used to find where idempotency and degraded-mode operation are needed.",
+   "implies": "Questions on behavior when an external dependency fails, idempotency and retry design (C-REL-DEPENDENCIES)."
+  },
+  {
+   "id": "B-OPS-CAPACITY",
+   "title": "Infrastructure owner's time allocation",
+   "sets": "team.infra_capacity",
+   "ask": "How much time can the infrastructure owner (one person who also does development) spend on infrastructure operations?",
+   "options": [
+    {
+     "key": "lt10",
+     "label": "Under 10% (barely any time)"
+    },
+    {
+     "key": "20_30",
+     "label": "20-30%"
+    },
+    {
+     "key": "gt50",
+     "label": "50% or more"
+    }
+   ],
+   "recommend": "lt10",
+   "why": "This is realistic for a small team where people wear several hats. Recommendations should favor managed services and automation (guardrails) over measures that depend on people.",
+   "implies": "The effort sizing (S/M/L) of recommendations, and whether to prefer managed/automated approaches over manual operating processes."
+  }
+ ],
+ "cards": [
+  {
+   "id": "C-SEC-THREAT",
+   "order": 10,
+   "title": "Threat modeling and awareness of threats",
+   "pillars": [
+    "security",
+    "operationalExcellence"
+   ],
+   "why": "Until you decide what you are protecting, you cannot prioritize encryption, permissions or monitoring. Even for a small team, one hour of discussion makes real progress.",
+   "ask": "Has the team ever discussed the most important assets in '{service}' and the worst things that could happen (for example, leakage of users' personal data, a regular user viewing another company's data, or an admin account takeover)?",
+   "ladder": {
+    "full": "A threat model (data flow diagram, main threats, countermeasures) is written down and revisited at every release or major change",
+    "partial": "It was discussed but not documented or revisited, or it covers only the main features",
+    "none": "Not done"
+   },
+   "recommend": {
+    "label": "Lightweight STRIDE session: one hour, once every six months (focused on permission boundaries between roles)",
+    "why": "The permission boundaries between roles, such as admin and regular user, are the biggest risk. Just building a role x data matrix pays off a lot.",
+    "steps": [
+     "One hour with {po} and two developers: draw one data flow diagram (user -> ALB -> app -> DB/S3/external services)",
+     "Make an access table of roles (admin / regular user, etc.) x data (personal data / business data / messages, etc.), and list the paths that could cross a boundary improperly",
+     "Turn the top 5 threats and their countermeasures (authorization checks, audit logs, encryption, rate limiting) into {ticket} issues, and put docs/threat-model.md in {vcs}",
+     "Revisit it every six months, and in the checklist for any PR that changes authentication, authorization or payment integration"
+    ],
+    "effort": "S",
+    "priority": "P1",
+    "owner": "Dev lead + PO"
+   },
+   "alternatives": [
+    {
+     "label": "Structure it with AWS Threat Composer (free tool)",
+     "when": "When you want to cover everything by following a template",
+     "tradeoff": "Takes a little time to learn"
+    },
+    {
+     "label": "Commission an external security assessment or threat analysis",
+     "when": "When a customer asks for it, or a certification (ISMS, etc.) is coming up",
+     "tradeoff": "High cost and coordination effort"
+    }
+   ],
+   "org_shape": "Threat modeling (1 hour) every six months with the PO and two developers. Output is docs/threat-model.md in {vcs}; countermeasures are tracked in {ticket}."
+  },
+  {
+   "id": "C-SEC-DATA-CLASS",
+   "order": 11,
+   "title": "Data classification and protection levels",
+   "pillars": [
+    "security"
+   ],
+   "why": "For a service that handles personal data, classification is the basis for encryption, retention periods and access control.",
+   "ask": "Do you classify the data you handle (for example public / internal / confidential / personal data)? Have you decided where personal data (names, contact details, submitted documents, messages, etc.) is stored, how long it is kept, and how it is deleted?",
+   "ladder": {
+    "full": "Classification criteria exist, and for each data store the protection level, retention period and deletion procedure are defined and followed in practice",
+    "partial": "You know where personal data lives, but classification criteria, retention periods or deletion procedures are missing or only partly in place",
+    "none": "No classification, and the locations of personal data cannot be listed"
+   },
+   "recommend": {
+    "label": "Three classes (public / internal / confidential (personal data)) plus a single data register",
+    "why": "At small scale, keeping a register of where confidential data lives and how long it is kept works better than adding more classes.",
+    "steps": [
+     "Fix the classes at three (public / internal / confidential). Personal data (user records, messages, uploaded document files, etc.) is confidential",
+     "Data register (spreadsheet or docs/data-inventory.md): data type / location (RDS, S3 bucket) / encryption / retention period / deletion method / owner",
+     "Set S3 lifecycle rules and versioning, and RDS retention, to match the register, and implement them through {ticket}",
+     "Write a runbook for account-closure and deletion requests (soft delete -> batch physical delete, how long backups still hold the data)",
+     "If automatic detection becomes necessary, consider Amazon Macie (detects personal data in S3)"
+    ],
+    "effort": "M",
+    "priority": "P1",
+    "owner": "Infra owner + PO"
+   },
+   "alternatives": [
+    {
+     "label": "Automatic detection and classification with Amazon Macie (S3)",
+     "when": "When S3 holds a large number of user-submitted files or attachments and you cannot keep track of where things are",
+     "tradeoff": "Cost grows with the amount of data scanned. Personal data inside RDS is out of scope"
+    },
+    {
+     "label": "Only two classes (personal data / everything else)",
+     "when": "When you want to start with the least effort",
+     "tradeoff": "Too coarse, and may fall short of future customer requirements"
+    }
+   ],
+   "org_shape": "Three classes managed in a data register (docs/data-inventory.md). Personal data is KMS-encrypted and has a defined retention period. The deletion procedure is a runbook."
+  },
+  {
+   "id": "C-SEC-3P-SHARING",
+   "order": 12,
+   "title": "Sharing resources with third parties",
+   "pillars": [
+    "security"
+   ],
+   "why": "Checks whether you have decided on a safe way to hand AWS resources or data to customers and outside vendors.",
+   "ask": "Do you ever share your AWS account or data with outside parties (contract developers, auditors, integrated SaaS)? If so, how?",
+   "ladder": {
+    "full": "Sharing is done through cross-account roles (ExternalId), RAM, presigned URLs and the like, with expiry, scope and periodic review defined",
+    "partial": "There is sharing, but methods and reviews are inconsistent, for example shared IAM users or permanent grants",
+    "none": "No rules for sharing (IAM users or keys are handed out)"
+   },
+   "recommend": {
+    "label": "Standardize on 'cross-account IAM role + ExternalId + expiry' for access, and S3 presigned URLs for data",
+    "why": "Simply stopping the handover of long-term access keys cuts the risk sharply.",
+    "steps": [
+     "For outside access, stop issuing IAM users and keys, and standardize on cross-account roles (ExternalId required, least privilege)",
+     "Grants are requested through a {ticket} issue and approved by {po}, with an expiry date (e.g. 90 days) written down and reviewed quarterly",
+     "Hand over data with short-lived S3 presigned URLs, or with a dedicated bucket whose bucket policy limits the scope",
+     "Turn on IAM Access Analyzer to detect external access"
+    ],
+    "effort": "S",
+    "priority": "P2",
+    "owner": "Infra owner"
+   },
+   "alternatives": [
+    {
+     "label": "Declare that nothing is shared (N/A)",
+     "when": "When there is no plan at all to share resources externally",
+     "tradeoff": "If sharing comes up later, work tends to proceed with no rules in place"
+    }
+   ],
+   "org_shape": "External sharing is standardized on cross-account roles (ExternalId). Grants go through {ticket} request, then approval, with a quarterly review. Access Analyzer provides detection."
+  },
+  {
+   "id": "C-SEC-FORENSIC",
+   "order": 13,
+   "title": "Preparing for forensics (evidence preservation) and emergency access (break-glass)",
+   "pillars": [
+    "security"
+   ],
+   "why": "Whether you can trace 'what happened' after an incident depends on log retention and snapshot procedures prepared beforehand.",
+   "ask": "If unauthorized access is suspected, do you have procedures to preserve logs (CloudTrail / ALB / application / VPC Flow) and to isolate and snapshot a server or container that may be compromised? Also, have you decided how to get into AWS in an emergency when SSO is unavailable (a break-glass admin, MFA and how it is stored, notification on use)?",
+   "ask_plain": "When unauthorized access is suspected, do you have a procedure for keeping and protecting the logs that show 'when, who and what', and for cutting a suspicious server off from the network? Have you decided how to get into AWS in an emergency when normal login does not work (where the emergency admin account is kept, and a way to notice when it is used)?",
+   "ladder": {
+    "full": "Procedures for log preservation, isolation and snapshots, and break-glass operations (storage, notification on use, rotation after use) are documented and have been tried at least once",
+    "partial": "Logs are being kept, but isolation and evidence-preservation procedures or break-glass operations are not in place",
+    "none": "Nothing in particular is prepared"
+   },
+   "recommend": {
+    "label": "Long-term, tamper-resistant log storage plus a one-page isolation procedure (swap SG -> snapshot -> investigate)",
+    "why": "For a container-based setup, log preservation and a 'cut it off with a security group' procedure are enough for a minimum first response.",
+    "steps": [
+     "Send CloudTrail (all Regions, log file validation) and ALB / VPC Flow logs to a dedicated S3 bucket. Use Object Lock or replicate to a separate account",
+     "Runbook: when compromise is suspected, (1) attach an isolation SG (2) preserve EBS snapshots / the task definition and image (3) export logs (4) report",
+     "Break-glass: prepare exactly one dedicated IAM role/user (hardware MFA, credentials kept offline, e.g. in a safe), notify {chat} immediately via SNS whenever it is used, and always rotate afterwards",
+     "Once a year, walk through the procedures (including break-glass) in a test environment and record the result in {ticket}"
+    ],
+    "effort": "M",
+    "priority": "P2",
+    "owner": "Infra owner"
+   },
+   "alternatives": [
+    {
+     "label": "Consider AWS Security Incident Response (managed)",
+     "when": "When you need 24/7 coverage or expert help",
+     "tradeoff": "Costs money. Tends to be overkill for a small team"
+    }
+   ],
+   "org_shape": "Logs are stored separately (S3 + validation). The isolation/preservation runbook for suspected compromise and the break-glass operations (notification on use, rotation after use) live under docs/ in {vcs} and are tested once a year."
+  },
+  {
+   "id": "C-SEC-APPSEC",
+   "order": 14,
+   "title": "Application security (training, penetration testing, ownership)",
+   "pillars": [
+    "security"
+   ],
+   "why": "Automated code checks can be confirmed from GitHub, but training, outside assessments and who owns security only come out in conversation.",
+   "ask": "Do your developers get security training (OWASP Top 10, for example)? Do you run external vulnerability assessments or penetration tests? Has someone been named as responsible for security?",
+   "ladder": {
+    "full": "Yearly training, regular external testing (for example once a year or after big changes), and a clearly named owner",
+    "partial": "Only training or only testing, or it happens irregularly",
+    "none": "Neither is done, or nobody owns security"
+   },
+   "recommend": {
+    "label": "Name one security owner, hold an OWASP study session twice a year, and get a pre-launch or yearly assessment",
+    "why": "For a small team the best value is: pick an owner, use a checklist before each release, and test once a year.",
+    "steps": [
+     "Name the dev lead as security owner (alongside their normal role). Add a security section to the PR template checklist",
+     "Hold a one-hour OWASP Top 10 / ASVS study session twice a year. Keep the notes in {docs}",
+     "Check AWS's penetration testing policy first, then get an external test once a year (or before a major feature launch). Track the fixes in {ticket}",
+     "Until external testing is feasible, run a DAST tool such as ZAP weekly in CI against staging"
+    ],
+    "effort": "M",
+    "priority": "P2",
+    "owner": "Dev lead"
+   },
+   "alternatives": [
+    {
+     "label": "Annual contract with an external vulnerability assessment service",
+     "when": "A customer requires it, or you need to support ISMS / SOC 2",
+     "tradeoff": "Expensive, and the team still has to spend time on fixes"
+    },
+    {
+     "label": "Bug bounty (invite-only)",
+     "when": "The user base has grown and you want continuous findings",
+     "tradeoff": "Heavy to operate"
+    }
+   ],
+   "org_shape": "Security owner = dev lead (part-time). Study session twice a year, external test once a year, security items in the PR template."
+  },
+  {
+   "id": "C-REL-RTO-RPO",
+   "order": 20,
+   "title": "Recovery objectives (RTO/RPO) and DR",
+   "pillars": [
+    "reliability"
+   ],
+   "why": "These are business requirements. Until they are set, there is no right answer for backups, Multi-AZ or DR.",
+   "ask": "If the system goes down or data is lost, within how many hours must it be back (RTO), and how many hours of data can you afford to lose at most (RPO)? Have you ever actually tried a restore?",
+   "ask_plain": "If '{service}' is down, after roughly how many hours does it start to seriously hurt the business or your promises to customers? If recent data such as sign-ups or orders were lost, how many hours' worth could you live with? Have you ever done a recovery drill?",
+   "ladder": {
+    "full": "RTO/RPO are agreed and written down, the setup can meet them, and restore/DR drills are run regularly",
+    "partial": "Targets exist only informally, or backups exist but no restore has been demonstrated and there is no DR procedure",
+    "none": "No targets, only backups, and even those are uncertain"
+   },
+   "recommend": {
+    "label": "Backup & Restore: RTO 4 hours / RPO 1 hour as example targets, plus a restore drill twice a year",
+    "why": "For a four-person team, Backup & Restore gives the best value. It can be done with Aurora/RDS PITR plus backup copies in another Region.",
+    "steps": [
+     "Agree the targets with {po} (for example RTO 4h, RPO 1h; look at critical parts separately) and write them in docs/dr-plan.md",
+     "DB: enable automated backups and PITR, with retention matched to the targets. Use AWS Backup for daily backups plus a copy in another Region",
+     "Keep the environment reproducible from IaC (turn the rebuild steps into a runbook)",
+     "Twice a year, run a restore drill (restore into a test environment and verify integrity), then measure how long it took and record it (AWS Backup restore testing can help)",
+     "If the targets get tighter, move step by step from pilot light to warm standby"
+    ],
+    "effort": "M",
+    "priority": "P1",
+    "owner": "Infra owner + PO"
+   },
+   "alternatives": [
+    {
+     "label": "Pilot light (keep a minimal setup always running in another Region)",
+     "when": "You need an RTO of around 1 hour",
+     "tradeoff": "Adds standing cost and configuration upkeep"
+    },
+    {
+     "label": "Warm standby / multi-site active-active",
+     "when": "Minute-level RTO and near-zero RPO are a business must",
+     "tradeoff": "Costs several times more and is complex to run; heavy for a small team"
+    }
+   ],
+   "org_shape": "RTO/RPO agreed with {po} and written in docs/dr-plan.md. AWS Backup (daily + copy in another Region) plus PITR, with restore drills twice a year."
+  },
+  {
+   "id": "C-REL-SLO",
+   "order": 21,
+   "title": "Availability targets (SLA/SLO) and control plane dependence",
+   "pillars": [
+    "reliability"
+   ],
+   "why": "Once you decide how much uptime is enough, you can justify how much to invest in redundancy.",
+   "ask": "Do you have an availability promise (SLA) to customers, or an internal availability target (SLO)? When something fails, does recovery depend on someone doing manual console work (control plane operations)?",
+   "ask_plain": "Have you promised customers something like 'we won't be down more than this much'? Do you have an internal goal? When a failure happens, is it only fixed if someone manually clicks through the console?",
+   "ladder": {
+    "full": "SLOs/SLAs are defined and measured, the setup meets them, and recovery works with capacity that is already in place",
+    "partial": "Targets are only verbal, not measured, or recovery is mostly manual",
+    "none": "No targets and no measurement"
+   },
+   "recommend": {
+    "label": "Start with an internal 99.9% SLO (about 43 minutes a month), measured with ALB success rate and a synthetic canary",
+    "why": "If outages disrupt customers' work in a B2B product, 99.9% is a realistic starting point. Promise it as an SLA only after you have a track record.",
+    "steps": [
+     "Set an internal SLO (for example 99.9%, an error budget of about 43 minutes a month). Share the actuals monthly in Slack (#ops)",
+     "Measurement: ALB 5xx rate and target responses, plus the success rate of a CloudWatch Synthetics canary (login, then the main screens)",
+     "Move recovery toward pre-configured automatic mechanisms (for example ECS task count, or capacity reserved in advance in the ASG), and write any manual console steps into the runbook",
+     "Consider an SLA (a contractual promise) only after at least three months of results"
+    ],
+    "effort": "M",
+    "priority": "P2",
+    "owner": "Infra owner"
+   },
+   "alternatives": [
+    {
+     "label": "Aim for 99.5% (about 3.6 hours a month)",
+     "when": "You want to keep initial cost to a minimum",
+     "tradeoff": "Outages are more likely to reach customers; revisit whether Multi-AZ is needed"
+    },
+    {
+     "label": "99.95% or higher",
+     "when": "Payments or work stoppage translate directly into losses",
+     "tradeoff": "Needs Multi-AZ, automatic recovery and strict change management, so costs rise"
+    }
+   ],
+   "org_shape": "Internal SLO of 99.9% (error budget 43 min/month). Measured with ALB + canary and shared monthly in #ops on {chat}."
+  },
+  {
+   "id": "C-REL-DEPENDENCIES",
+   "order": 22,
+   "title": "External dependencies, idempotency and degraded operation",
+   "pillars": [
+    "reliability"
+   ],
+   "why": "Checks what happens when an outside service (email, payments, authentication) is down, and when a retry causes double processing.",
+   "ask": "Do you depend on outside services (email delivery, payments, SSO, third-party integrations)? What happens when one of them is down (degrade, retry, switch to manual), and are you protected against the same request being processed twice (idempotency)?",
+   "ladder": {
+    "full": "Dependencies are listed, and for the important ones idempotency, timeouts, retries and degraded modes are implemented and tested",
+    "partial": "Partly implemented, no dependency list, or not tested",
+    "none": "Not considered"
+   },
+   "recommend": {
+    "label": "A dependency register, idempotency keys on important write APIs, and timeouts, exponential backoff and circuit breakers on outbound calls",
+    "why": "Protect first the places where a mistake becomes a business incident, such as double orders or double sends.",
+    "steps": [
+     "Dependency register (docs/dependencies.md): service name, purpose, impact when it fails, fallback or manual procedure",
+     "Idempotency keys (request ID plus a unique constraint) on writes with side effects, such as orders, notifications and payments",
+     "A shared timeout (for example 3-5 seconds) and retry policy (exponential backoff with jitter, capped attempts) for outbound HTTP calls",
+     "Decide per feature how it degrades during an outage (for example, queue emails and send them later, or switch off just that feature with a feature flag)"
+    ],
+    "effort": "M",
+    "priority": "P2",
+    "owner": "Dev lead"
+   },
+   "alternatives": [
+    {
+     "label": "Make it asynchronous with a message queue (SQS)",
+     "when": "Many tasks can tolerate delay, such as email and notifications",
+     "tradeoff": "More implementation and operational complexity"
+    }
+   ],
+   "org_shape": "Dependency register (docs/dependencies.md). Idempotency keys on write APIs; shared timeout / retry / degradation rules for outbound calls."
+  },
+  {
+   "id": "C-REL-TESTING",
+   "order": 23,
+   "title": "Test strategy (functional, load, failure, game days)",
+   "pillars": [
+    "reliability",
+    "performance"
+   ],
+   "why": "A scan shows whether tests exist in GitHub, but whether load tests and failure drills happen can only be learned by asking.",
+   "ask": "Do you run automated tests before deploying, load tests, and failure drills (game days or chaos experiments)?",
+   "ask_plain": "Do you have something that automatically checks the app before each release, a test for when lots of traffic arrives, and a practice session where you cause a failure on purpose and rehearse the response (a game day)?",
+   "ladder": {
+    "full": "Functional tests are required in CI, load tests run regularly, and failure drills (game days etc.) happen yearly",
+    "partial": "Functional tests exist, but load tests and failure drills are missing or irregular",
+    "none": "Testing is mostly manual, or not done"
+   },
+   "recommend": {
+    "label": "Required functional tests in CI, a lightweight k6 load test before releases, and a one-hour game day once a year",
+    "why": "For failure drills, one scenario is enough, done first on paper and then for real, for example a DB failover or stopping one task.",
+    "steps": [
+     "{ci}: make passing automated tests a condition for merging into main (branch protection / rulesets)",
+     "Keep k6 (or Locust) scripts for the main flow (login, search, order) in the repository and run them on staging monthly or before big releases",
+     "Once a year, hold a game day. Example scenarios: stop one task, DB failover, outage of an external API. Narrate live in {chat} and log what you learned in {ticket}",
+     "When you have spare capacity, automate the scenarios with AWS Fault Injection Service"
+    ],
+    "effort": "M",
+    "priority": "P2",
+    "owner": "Two developers + Infra owner"
+   },
+   "alternatives": [
+    {
+     "label": "Load test only ahead of peaks (before campaigns)",
+     "when": "Traffic spikes seasonally or with campaigns",
+     "tradeoff": "You will not notice degradation in normal times"
+    },
+    {
+     "label": "Make chaos experiments routine with AWS FIS",
+     "when": "You have a team setup where failure drills can become a habit",
+     "tradeoff": "You need to design safety guards (stop conditions)"
+    }
+   ],
+   "org_shape": "Required CI tests + k6 load tests (monthly / before big releases) + one game day a year. Results recorded in {ticket}."
+  },
+  {
+   "id": "C-ARCH-STYLE",
+   "order": 24,
+   "title": "Architecture style (monolith vs. split) and fault containment",
+   "pillars": [
+    "reliability"
+   ],
+   "why": "Splitting a system further than the team can handle makes it less reliable. This checks whether the choice was deliberate.",
+   "ask": "What is the current app structure (monolith / several services), and why was it chosen? Is there something that stops a failure in one part (for example email sending or search) from spreading to everything, such as resource separation or queues?",
+   "ladder": {
+    "full": "The reason for the chosen style is on record, and isolation that limits how far a failure spreads (queues, separate pools, timeouts) is implemented",
+    "partial": "A monolith or similar runs fine, but the reason is not recorded or isolation exists only in places",
+    "none": "Ad hoc, with no thought given to how far failures spread"
+   },
+   "recommend": {
+    "label": "A modular monolith, with only heavy or externally dependent work split out into queue-fed workers",
+    "why": "With two developers, full microservices cost more than they give. Draw the boundaries (domains) in the code, and isolate only the work whose failures would spread widely.",
+    "steps": [
+     "Record in an ADR that you chose a modular monolith, with the reason and the conditions for revisiting it (team size, deploy frequency)",
+     "Split the code into modules along domain boundaries (for example members / orders / messaging / payments / admin) and set rules for dependency direction",
+     "Move heavy work such as email sending, search index updates and aggregation into separate workers / task definitions (for example separate ECS services)",
+     "Limit connection pools, thread counts and timeouts per feature (bulkheads)"
+    ],
+    "effort": "M",
+    "priority": "P3",
+    "owner": "Dev lead"
+   },
+   "alternatives": [
+    {
+     "label": "Split into services (microservices)",
+     "when": "Teams have separated, and deploy frequency or scaling needs differ greatly by feature",
+     "tradeoff": "Operations, observability and testing take more effort"
+    }
+   ],
+   "org_shape": "Modular monolith (reason recorded in an ADR) with only heavy work split into workers. Connection pools and timeouts limited per feature."
+  },
+  {
+   "id": "C-OPS-OWNERSHIP",
+   "order": 30,
+   "title": "Roles and ownership",
+   "pillars": [
+    "operationalExcellence"
+   ],
+   "why": "In a team of four, who is responsible for what tends to stay unspoken, and things stall during incidents and vacations. One table fixes that.",
+   "ask": "Is there a named owner (and a deputy) for each of: resources (AWS accounts / services), procedures, and day-to-day operational tasks? How do requests for changes and exceptions come in?",
+   "ladder": {
+    "full": "Written down (for example as a RACI), deputies are named, and how to submit requests and exceptions is defined",
+    "partial": "Owners are understood informally, but nothing is written and there are no deputies",
+    "none": "Not decided, or everything sits with one person"
+   },
+   "recommend": {
+    "label": "One RACI table, a deputy (backup owner) for each area, and a single intake point for requests in #ops on {chat}",
+    "why": "With only one infra owner, dependence on one person is the biggest risk. Name a deputy and share the procedures.",
+    "steps": [
+     "In docs/raci.md, list each area (AWS / app / DB / CI / cost / security / customer support) against the person doing it (R), the approver (A) and the deputy",
+     "Name the other developer as the deputy for the infra owner, and share AWS access and the runbooks with them",
+     "Take change and exception requests in #ops on {chat} and file them in {ticket} (only ticketed requests get done)",
+     "Add the resource tag Owner=<person or team name> through default tags in IaC"
+    ],
+    "effort": "S",
+    "priority": "P2",
+    "owner": "PO + Infra owner"
+   },
+   "alternatives": [
+    {
+     "label": "Introduce an on-call rotation",
+     "when": "You need to handle night or holiday incidents that affect customers",
+     "tradeoff": "Adds load on members; you need to design allowances or compensatory time off"
+    }
+   ],
+   "org_shape": "RACI table (docs/raci.md) with deputies named. Requests go to #ops on {chat}, then {ticket}. The Owner resource tag shows who is responsible."
+  },
+  {
+   "id": "C-OPS-INCIDENT",
+   "order": 31,
+   "title": "Incident response process (priority, escalation, customer communication)",
+   "pillars": [
+    "operationalExcellence",
+    "reliability"
+   ],
+   "why": "If the path for raising the alarm is settled in advance, hesitation at the start and delays in telling customers drop sharply.",
+   "ask": "Is the flow when something breaks decided: detection, first responder, severity call, escalation, telling customers?",
+   "ladder": {
+    "full": "Severity criteria, escalation contacts and the customer-notice method/templates are written down and have been rehearsed",
+    "partial": "There is a rough flow, but no criteria or templates",
+    "none": "Not decided"
+   },
+   "recommend": {
+    "label": "Three severity levels, auto-gathering responders in {chat} #incident, and templates for the status page / email",
+    "why": "Lightness matters for four people. Decide only the severity levels, how to run the thread, and the customer notice templates.",
+    "steps": [
+     "Severity: Sev1 (full outage / data leak), Sev2 (main feature degraded), Sev3 (minor). Add target response times alongside",
+     "Detection: CloudWatch alarm -> SNS -> AWS Chatbot (Amazon Q Developer in chat applications) -> notify {chat} #alerts",
+     "For Sev1/2, create an #incident channel (or use an existing thread) and assign an incident commander, a hands-on responder and a communicator",
+     "Customer notice: prepare templates for email / in-app notice / a simple status page; {po} approves before sending",
+     "Write the escalation contacts (and deputies) in docs/escalation.md"
+    ],
+    "effort": "M",
+    "priority": "P1",
+    "owner": "Infra owner + PO"
+   },
+   "alternatives": [
+    {
+     "label": "An incident management tool (PagerDuty / Opsgenie / AWS Incident Manager)",
+     "when": "You need night-time on-call",
+     "tradeoff": "Monthly fees and some operational design needed"
+    }
+   ],
+   "org_shape": "Three severity levels. Alerts go to {chat} #alerts; Sev1/2 are handled in #incident with a named commander. Customer notice templates are approved by {po}."
+  },
+  {
+   "id": "C-OPS-RUNBOOKS",
+   "order": 32,
+   "title": "Runbooks and playbooks",
+   "pillars": [
+    "operationalExcellence",
+    "reliability",
+    "security"
+   ],
+   "why": "Written procedures are the best-value way to avoid depending on individuals. A scan shows whether procedures exist in the repository.",
+   "ask": "Do you have written procedures (runbooks) for deploy, rollback, DB recovery and handling the main alerts, and investigation procedures (playbooks) for failures?",
+   "ladder": {
+    "full": "Each main routine task and alert has a procedure, kept up to date and rehearsed regularly",
+    "partial": "Only some procedures are written, they are outdated, or they live in someone's head",
+    "none": "No written procedures"
+   },
+   "recommend": {
+    "label": "Create docs/runbooks/ with one procedure per alert, and link it from the alarm description",
+    "why": "If you can jump from an alert straight to its runbook, the first response is faster and handover is easy.",
+    "steps": [
+     "First five: deploy/rollback, DB failover and restore, per-alert responses (CPU / 5xx / disk), certificate renewal, suspected account compromise",
+     "Settle on a template (symptoms / check commands / decision criteria / recovery steps / escalation) and put runbooks through PR review",
+     "Put the runbook URL in the CloudWatch alarm's AlarmDescription (make it mandatory in IaC)",
+     "Once a quarter, someone other than the owner follows each procedure and updates it"
+    ],
+    "effort": "M",
+    "priority": "P2",
+    "owner": "Infra owner"
+   },
+   "alternatives": [
+    {
+     "label": "Automate procedures with AWS Systems Manager Automation / documents",
+     "when": "Procedures are stable and you want to automate running them",
+     "tradeoff": "Takes effort to build"
+    }
+   ],
+   "org_shape": "One procedure per alert in docs/runbooks/ of {vcs}, with the URL in AlarmDescription. Each quarter someone other than the owner runs and updates them."
+  },
+  {
+   "id": "C-OPS-POSTMORTEM",
+   "order": 33,
+   "title": "Post-mortems, sharing lessons, knowledge management",
+   "pillars": [
+    "operationalExcellence",
+    "reliability",
+    "security"
+   ],
+   "why": "A mechanism so the same failure does not repeat. What matters is keeping it blame-free and light enough to keep going.",
+   "ask": "After an incident or near miss, do you hold a review (cause analysis, prevention) and share and keep the results?",
+   "ladder": {
+    "full": "Every Sev1/2 gets a blameless review, actions are tracked, and the learnings are kept and shared as knowledge",
+    "partial": "Only big incidents, actions are not tracked, or sharing is limited",
+    "none": "Not done"
+   },
+   "recommend": {
+    "label": "Blameless post-mortem (30 minutes) within a week of any Sev1/2, kept in docs/postmortems/ of {vcs}",
+    "why": "One template and a 30-minute meeting are enough. The key is turning actions into issues with an owner and a due date.",
+    "steps": [
+     "Put a template (summary / impact / timeline / root cause (5 Whys) / what went well / actions) at docs/postmortems/_template.md",
+     "Hold the review within a week after a Sev1/2, for 30 minutes. State the principle of not blaming individuals",
+     "File actions in {ticket} with the label postmortem, and set due dates and owners",
+     "Check unfinished actions at the monthly meeting. Post a short summary of the learnings in #ops on {chat}"
+    ],
+    "effort": "S",
+    "priority": "P2",
+    "owner": "Infra owner + PO"
+   },
+   "alternatives": [
+    {
+     "label": "Lightweight version: just a summary of the Slack thread",
+     "when": "You want the lowest possible load as a first step",
+     "tradeoff": "Hard to store and search, and weak at tracking prevention work"
+    }
+   ],
+   "org_shape": "Blameless review (30 min) within a week of any Sev1/2. Kept in docs/postmortems/, with actions tracked in {ticket}."
+  },
+  {
+   "id": "C-OPS-ORR",
+   "order": 34,
+   "title": "Operational readiness review, release decision, rollback plan",
+   "pillars": [
+    "operationalExcellence"
+   ],
+   "why": "Judging 'is it safe to ship?' by the same criteria every time reduces accidents.",
+   "ask": "Before releasing a new feature or big change, is there a standard or checklist for confirming operational readiness (monitoring, procedures, rollback)? Have you decided in advance how to undo a failed change?",
+   "ask_plain": "Before shipping a new feature or large change, do you have a rule or checklist to confirm that monitoring, procedures and a way back are in place? Have you decided beforehand how to undo it if it goes wrong?",
+   "ladder": {
+    "full": "A checklist exists, is used and recorded for each release, and rollback is automatic or scripted",
+    "partial": "Checks rely on experience, or only some rollback procedures exist",
+    "none": "Nothing in particular is decided"
+   },
+   "recommend": {
+    "label": "A release checklist in the PR template, plus automatic rollback with the ECS deployment circuit breaker",
+    "why": "Putting the checklist in the PR template lets it continue at almost no running cost.",
+    "steps": [
+     "Add to the PR template: monitoring added / alerts added / rollback method / DB migration backward compatible / feature flag",
+     "Deploy: besides a gradual rollout (ECS rolling update with health checks), enable the circuit breaker with rollback turned on",
+     "Make expand/contract (backward-compatible) the default for DB migrations",
+     "Only for large changes, hold a 15-minute readiness review before release with everyone involved"
+    ],
+    "effort": "S",
+    "priority": "P2",
+    "owner": "Dev lead"
+   },
+   "alternatives": [
+    {
+     "label": "Blue/green deployment (CodeDeploy)",
+     "when": "You need zero downtime and an instant switch back",
+     "tradeoff": "More complex setup and higher cost"
+    }
+   ],
+   "org_shape": "Operational readiness checks in the PR template. ECS circuit breaker with automatic rollback. Backward-compatible DB migrations."
+  },
+  {
+   "id": "C-OPS-SUPPORT-PLAN",
+   "order": 35,
+   "title": "AWS support plan and operational support arrangements",
+   "pillars": [
+    "operationalExcellence"
+   ],
+   "why": "Decides whether you need the features that require Business or above (the full set of Trusted Advisor checks, the AWS Health API, technical support).",
+   "ask": "Which AWS support plan does production use? Is it decided who you contact when you need help with an AWS outage or a configuration question?",
+   "ladder": {
+    "full": "You are on a support plan that fits production requirements, and the contact point and procedure are decided",
+    "partial": "Still on Basic/Developer, deciding case by case when needed",
+    "none": "You know neither the plan nor the contact point"
+   },
+   "recommend": {
+    "label": "Consider Business (or Business Support+) around production launch or the FTR / partner certification. Until then, route AWS Health Dashboard notifications to {chat}",
+    "why": "Being able to consult technical support immediately during an outage is a big insurance policy for a four-person team.",
+    "steps": [
+     "Check the current plan (billing console). Compare the production business impact against the cost, and decide with {po} whether it is needed",
+     "If you do not subscribe: send AWS Health Dashboard (account-level) notifications through EventBridge -> SNS -> {chat}",
+     "Contact point: write down in docs/escalation.md who opens support cases (infra owner + deputy)",
+     "If you subscribe to Business, add all the Trusted Advisor checks to the monthly review"
+    ],
+    "effort": "S",
+    "priority": "P3",
+    "owner": "PO + Infra owner"
+   },
+   "alternatives": [
+    {
+     "label": "Support through an AWS partner / reseller",
+     "when": "You value Japanese-language support and a single point of contact",
+     "tradeoff": "Their fee is added on top of usage costs"
+    }
+   ],
+   "org_shape": "{po} decides the support plan. Health notifications go to {chat}. Case filer and deputy are written in docs/escalation.md."
+  },
+  {
+   "id": "C-DEV-PROCESS",
+   "order": 36,
+   "title": "Development process (review, CI, dependencies, security testing)",
+   "pillars": [
+    "operationalExcellence",
+    "security",
+    "performance"
+   ],
+   "why": "GitHub settings (branch protection, CI, Dependabot and so on) are checked by the scan. This card asks about practices the settings cannot show, and about items the scan could not read.",
+   "ask": "Do you require code review, run tests / static analysis / dependency scanning in CI, ship small changes often, and share design standards?",
+   "ladder": {
+    "full": "Required review (branch protection), CI with tests / SAST / SCA / secret scanning, small PRs and shared design standards are all in place",
+    "partial": "Only some of it (for example review exists but is not required, CI runs tests only, no design standards)",
+    "none": "Almost none of this"
+   },
+   "recommend": {
+    "label": "Protect the main branch (one review + CI required), Dependabot, secret scanning, and small PRs (about 400 lines at most)",
+    "why": "Even for a small team, 'review required + CI required' gives the best accident prevention per effort.",
+    "steps": [
+     "{vcs} branch protection / rulesets: PR required, one approval, CI must pass, no force push",
+     "CI ({ci}): tests + lint + dependency checks (Dependabot / dependency-review) + secret scanning + SAST (CodeQL etc.; check your plan)",
+     "Use CODEOWNERS to pin reviewers for authorization, payments and infrastructure changes",
+     "Design standards: docs/engineering-guidelines.md (naming, error handling, logging, how to write authorization) and ADRs",
+     "Keep PRs small (about 400 lines or less) and decouple releases from merges with feature flags"
+    ],
+    "effort": "M",
+    "priority": "P1",
+    "owner": "Dev lead"
+   },
+   "alternatives": [
+    {
+     "label": "Trunk-based development with feature flags and daily releases",
+     "when": "You want to release more often and keep changes small",
+     "tradeoff": "Needs discipline in managing flags"
+    }
+   ],
+   "org_shape": "Branch protection (PR required, 1 approval, CI required). Tests / lint / dependencies / secrets / SAST in {ci}. CODEOWNERS pins reviewers for critical areas."
+  },
+  {
+   "id": "C-OPS-HEALTH-REVIEW",
+   "order": 37,
+   "title": "Operations metrics and regular review",
+   "pillars": [
+    "operationalExcellence",
+    "reliability"
+   ],
+   "why": "Measuring is not enough. This checks that there is also a regular place where the numbers get looked at.",
+   "ask": "Do you track operational goals and KPIs (for example number of incidents, recovery time, deploy frequency, alert count), review them on a schedule, and turn what you find into improvement items?",
+   "ladder": {
+    "full": "KPIs are defined and collected automatically, reviewed at a regular meeting (monthly or similar), and improvements get prioritized",
+    "partial": "Only some metrics are tracked, or the numbers are looked at at irregular times",
+    "none": "Nothing is measured and nothing is reviewed"
+   },
+   "recommend": {
+    "label": "Four KPIs (the DORA metrics plus alert count), reviewed for 30 minutes each month",
+    "why": "Deploy frequency, change failure rate, recovery time and lead time can be collected automatically from {vcs}/{ci}, so the upkeep stays small.",
+    "steps": [
+     "Limit the KPIs to four: deploy frequency, change failure rate, MTTR, and alert count (including how many needed no action)",
+     "Collect them from the {ci}/{vcs} APIs and CloudWatch with a monthly script or a spreadsheet",
+     "Hold a 30-minute monthly operations review (PO + developers), pick one or two top issues and put them in {ticket}",
+     "Build one CloudWatch dashboard and share the screen at the meeting"
+    ],
+    "effort": "S",
+    "priority": "P3",
+    "owner": "Infra owner"
+   },
+   "alternatives": [
+    {
+     "label": "Quarterly review only",
+     "when": "When you want to start with the least effort",
+     "tradeoff": "Feedback arrives late, so improvements tend to stall"
+    }
+   ],
+   "org_shape": "30-minute monthly operations review (DORA metrics + alert count). Shared CloudWatch dashboard; improvements go to {ticket}."
+  },
+  {
+   "id": "C-OPS-PRIORITIES",
+   "order": 38,
+   "title": "Customer needs, priorities and trade-off decisions",
+   "pillars": [
+    "operationalExcellence"
+   ],
+   "why": "Checks that operational priorities line up with business priorities.",
+   "ask": "How do you gather the needs of external customers and of internal users (admin, sales and so on) and feed them into operations and development priorities? Do you have criteria for trade-off decisions (speed / cost / quality / risk)?",
+   "ladder": {
+    "full": "Needs are gathered regularly, there are prioritization criteria (for example RICE or impact), and decisions are written down",
+    "partial": "Requests are heard, but prioritization and trade-off criteria depend on individuals",
+    "none": "Ad hoc"
+   },
+   "recommend": {
+    "label": "Monthly priority meeting (PO + Sales + developers), an impact x urgency rule, and key decisions recorded as ADRs",
+    "why": "Sales holds the voice of the customer, so set up a routine that carries it into development priorities.",
+    "steps": [
+     "Add a 'customer request' label in {ticket}; Sales files items weekly (customer name, impact, frequency)",
+     "Monthly, 30 minutes: PO, Sales and developers set priorities by impact x urgency",
+     "Record operational trade-off decisions (for example availability vs cost) in an ADR, including why that option was chosen",
+     "Define and share at most three KPIs (for example orders completed, uptime, support inquiries)"
+    ],
+    "effort": "S",
+    "priority": "P3",
+    "owner": "PO"
+   },
+   "alternatives": [
+    {
+     "label": "Quarterly OKRs that also cover operations goals",
+     "when": "When the team grows and you need direction to stay aligned",
+     "tradeoff": "More overhead to run"
+    }
+   ],
+   "org_shape": "Sales files customer requests in {ticket}. Priorities are set monthly. Trade-offs are recorded in ADRs."
+  },
+  {
+   "id": "C-OPS-COMPLIANCE",
+   "order": 39,
+   "title": "Governance and compliance requirements",
+   "pillars": [
+    "operationalExcellence",
+    "security"
+   ],
+   "why": "Laws, contracts and certifications set the ground rules for how you operate. For a service that handles personal data, this check is a must.",
+   "ask": "Do you know which regulations, contracts and certifications you have to satisfy (Japan's Act on the Protection of Personal Information, industry-specific laws and guidelines, customers' security questionnaires, ISMS / PrivacyMark / SOC 2, AWS FTR and so on), and have you reflected them in your operating rules?",
+   "ladder": {
+    "full": "Requirements are listed, owners are named, and compliance is checked on a regular basis",
+    "partial": "The main requirements (for example Japan's Act on the Protection of Personal Information) are on people's minds, but there is no list, owner or routine check yet",
+    "none": "Not known"
+   },
+   "recommend": {
+    "label": "A one-page requirements list, an owner, a yearly check, and a stock of answers to customers' questionnaires",
+    "why": "Collecting the answers to the questionnaires that come in through sales effectively builds your requirements list for you.",
+    "steps": [
+     "List requirements, their basis, owner and check frequency in docs/compliance.md (Japan's Act on the Protection of Personal Information, industry laws and guidelines, customer demands)",
+     "Accumulate the questions and answers of the security questionnaires Sales receives in a shared drive",
+     "{po} decides whether ISMS / PrivacyMark / SOC 2 are needed, together with the business plan (getting certified is a medium-term item)",
+     "If you aim for AWS FTR or partner qualification, build the W-A review results into requirements management"
+    ],
+    "effort": "M",
+    "priority": "P2",
+    "owner": "PO"
+   },
+   "alternatives": [
+    {
+     "label": "Start an ISMS / PrivacyMark certification project",
+     "when": "When it becomes a procurement requirement for a large customer",
+     "tradeoff": "Six months to a year of effort and cost"
+    }
+   ],
+   "org_shape": "Requirements list and owners in docs/compliance.md. Customer questionnaire answers are stockpiled. Whether to certify is the PO's call, made with the business plan."
+  },
+  {
+   "id": "C-OPS-CULTURE",
+   "order": 40,
+   "title": "Organizational culture (sponsorship, escalation, communication)",
+   "pillars": [
+    "operationalExcellence"
+   ],
+   "why": "In a small team, culture is operational quality. Turning it into a few rules keeps it intact as people join.",
+   "ask": "Has leadership (or the business owner) said explicitly that they will spend time and resources on operational quality and security? Is there a climate, or a rule, that lets people share and escalate problems and incidents without hesitation?",
+   "ladder": {
+    "full": "There is a clear sponsor, escalation criteria and communication rules are written down, and decision authority has been delegated to members",
+    "partial": "The atmosphere is good, but rules and the scope of authority are not written down",
+    "none": "Not particularly thought about"
+   },
+   "recommend": {
+    "label": "Name the PO / head of the company as operations sponsor, adopt a 'when in doubt, share it on Slack' rule, and write down what members may decide on their own",
+    "why": "Simply stating that the PO is accountable for securing resources (time and money for improvements) makes decisions faster.",
+    "steps": [
+     "Decide who is finally accountable for operational quality (the sponsor) and set aside time for improvement (for example 10-20% of each sprint)",
+     "Create #ops and #incident in {chat} and pin a 'share what you notice, no blame' rule",
+     "Write down what members may do without prior approval (for example rollback, turning a feature flag off, restarting a task)",
+     "Make messages say who, by when, and what (pin a template)"
+    ],
+    "effort": "S",
+    "priority": "P3",
+    "owner": "PO"
+   },
+   "alternatives": [
+    {
+     "label": "1-on-1s plus a monthly retrospective (KPT)",
+     "when": "When you want to strengthen psychological safety and information sharing",
+     "tradeoff": "Needs a time investment"
+    }
+   ],
+   "org_shape": "Operations sponsor = PO. #ops / #incident in {chat}, with the scope of decision authority written down. 10-20% of each sprint reserved for improvement."
+  },
+  {
+   "id": "C-OPS-LEARNING",
+   "order": 41,
+   "title": "Skill growth, experimentation, and keeping operations capability",
+   "pillars": [
+    "operationalExcellence"
+   ],
+   "why": "When AWS knowledge sits with a single infrastructure person, work becomes dependent on that person and nobody else gets a chance to learn.",
+   "ask": "Do members have time and support to build their skills (study time, certifications, study sessions), and is there an environment and a culture where they can experiment safely? Is the operations owner's (infrastructure owner's) knowledge shared with the rest of the team?",
+   "ladder": {
+    "full": "Study time and budget exist, an experiment environment exists, and knowledge sharing and training of a backup are planned",
+    "partial": "Relies on individuals' own study, or an experiment environment exists but there is no plan for sharing or training",
+    "none": "Nothing in particular"
+   },
+   "recommend": {
+    "label": "4 hours of study time a month, AWS certification / workshops, a sandbox account with a spending cap, and a monthly infrastructure knowledge session",
+    "why": "Growing a stand-in for the infrastructure owner is one of the most important reliability measures.",
+    "steps": [
+     "Reserve 4 hours a month for study (counted as work time) and use AWS Skill Builder and the Well-Architected labs",
+     "Encourage experiments in a sandbox AWS account (spending limit and automatic shutdown with AWS Budgets)",
+     "Once a month for 30 minutes, the infrastructure owner shares operations knowledge (record it and write it into docs)",
+     "Make a plan for growing a backup person, and pair on incident response"
+    ],
+    "effort": "S",
+    "priority": "P3",
+    "owner": "PO + Infra owner"
+   },
+   "alternatives": [
+    {
+     "label": "Support for AWS certification (exam fee subsidy)",
+     "when": "When you want an objective measure of proficiency",
+     "tradeoff": "Costs money and study time"
+    }
+   ],
+   "org_shape": "4 hours of study time a month, a sandbox AWS account (with a budget cap), a monthly infrastructure knowledge session, and a plan to train a backup."
+  },
+  {
+   "id": "C-OPS-IMPROVEMENT",
+   "order": 42,
+   "title": "Continuous improvement process and reserved improvement time",
+   "pillars": [
+    "operationalExcellence"
+   ],
+   "why": "Improvement runs on three things: set time aside, have a reason for it, and get feedback.",
+   "ask": "Have you settled why improvements get done (what justifies them), where feedback comes in from, and how much time is set aside for them?",
+   "ladder": {
+    "full": "There is an improvement backlog, time is set aside every sprint, and feedback (from customers and from operations) flows into it",
+    "partial": "Improvements happen when someone notices, or the time set aside is unreliable",
+    "none": "There is no mechanism for improvement"
+   },
+   "recommend": {
+    "label": "An improvement backlog ({ticket} label 'improvement'), 15% of each sprint, fed by post-mortems, customer requests and alert counts",
+    "why": "Fixing the inputs and the time slot is enough to get continuous improvement turning.",
+    "steps": [
+     "Create an 'improvement' label in {ticket} and collect post-mortems, alert fatigue and customer requests into it",
+     "Fix 15% of sprint planning as the improvement slot (agree it with the PO)",
+     "At the monthly operations review, check the effect (KPI movement) and stop measures that are not paying off"
+    ],
+    "effort": "S",
+    "priority": "P3",
+    "owner": "PO"
+   },
+   "alternatives": [
+    {
+     "label": "A quarterly improvement sprint",
+     "when": "When daily development is so busy that a slot is hard to keep",
+     "tradeoff": "Improvements tend to go stale"
+    }
+   ],
+   "org_shape": "'improvement' backlog in {ticket}, with 15% of each sprint fixed as the improvement slot. Inputs: post-mortems / customer requests / alerts."
+  },
+  {
+   "id": "C-ARCH-DECISIONS",
+   "order": 50,
+   "title": "Architecture decision process (trade-offs, cost, data)",
+   "pillars": [
+    "performance",
+    "costOptimization"
+   ],
+   "why": "If the reason for a design is not recorded, it cannot be revisited. An ADR is the cheapest fix.",
+   "ask": "When you choose technology (compute / database / network), do you weigh trade-offs, cost and measured data, and record the reasoning?",
+   "ladder": {
+    "full": "Reasons are recorded in ADRs or similar, and cost estimates plus benchmarks or metrics back the decision",
+    "partial": "Decisions are made but only partly recorded, or little of the validation uses data",
+    "none": "Decided by experience or habit, nothing recorded"
+   },
+   "recommend": {
+    "label": "Make a one-page ADR the standard for technology choices, and attach a cost estimate and a quick benchmark at selection time",
+    "why": "Only the important choices need it. Start with decisions that are expensive to change: database, compute, authentication, search.",
+    "steps": [
+     "Create a template in docs/adr/ (context / options / decision / trade-offs / cost / conditions for revisiting)",
+     "Write ADRs after the fact for the existing key decisions (database, compute approach, authentication, search)",
+     "At selection time, estimate the monthly cost with AWS Pricing Calculator and, if needed, attach results of a quick benchmark (k6 and similar)",
+     "Each quarter, check with metrics (CloudWatch / Performance Insights) that the choices still hold"
+    ],
+    "effort": "M",
+    "priority": "P3",
+    "owner": "Dev lead"
+   },
+   "alternatives": [
+    {
+     "label": "Run an AWS Well-Architected review (this tool) every six months",
+     "when": "When you want to check regularly against an external yardstick that your decisions still hold",
+     "tradeoff": "Takes review effort"
+    }
+   ],
+   "org_shape": "ADRs (docs/adr/) record the reason, cost and trade-offs of technology choices. Estimated with Pricing Calculator, verified quarterly with metrics."
+  },
+  {
+   "id": "C-ARCH-REVIEW",
+   "order": 51,
+   "title": "Regular review of new services and best practices",
+   "pillars": [
+    "performance",
+    "costOptimization",
+    "security",
+    "operationalExcellence"
+   ],
+   "why": "AWS releases new features often. Without a set time slot for reviewing, you stay on an old architecture.",
+   "ask": "Do you keep up with new AWS services, features and best practices (including Well-Architected updates) on a regular basis and reflect them in a review of your own architecture?",
+   "ladder": {
+    "full": "Reviewed at a regular meeting (quarterly or similar), and the results go into the backlog",
+    "partial": "Only checked when an individual happens to notice",
+    "none": "Not done"
+   },
+   "recommend": {
+    "label": "A 60-minute 'architecture review' once a quarter, plus the AWS What's New RSS feed posted to {chat} #aws-news",
+    "why": "Automate collecting the information and keep only the judgment for the quarterly meeting.",
+    "steps": [
+     "Connect AWS What's New (related services only) and the AWS blog RSS to {chat} #aws-news",
+     "For 60 minutes each quarter, look at the W-A review results (this tool) and the new features, and file improvement candidates in {ticket}",
+     "In the same meeting, take stock of version updates (EOL) for dependent libraries, runtimes and DB engines",
+     "Also check the Trusted Advisor / Compute Optimizer recommendations at the same time"
+    ],
+    "effort": "S",
+    "priority": "P3",
+    "owner": "Infra owner"
+   },
+   "alternatives": [
+    {
+     "label": "Regular reviews with your AWS account SA or a partner",
+     "when": "When you want outside expertise",
+     "tradeoff": "Costs money or requires building a relationship"
+    }
+   ],
+   "org_shape": "60-minute quarterly review. What's New is auto-posted to {chat} #aws-news. The W-A review is repeated every six months."
+  },
+  {
+   "id": "C-COST-OWNERSHIP",
+   "order": 60,
+   "title": "Cost owner, KPI and allocation",
+   "pillars": [
+    "costOptimization"
+   ],
+   "why": "A team of four cannot have a dedicated FinOps person. Deciding just three things (who looks, the target, the allocation) gets you most of the way.",
+   "ask": "Have you decided who looks at the AWS bill each month, and what the monthly target (budget) is? Can you split costs by service / environment (with tags and so on)?",
+   "ladder": {
+    "full": "An owner and a budget/KPI are set, costs can be split by environment or feature with tags or similar, and they are checked monthly",
+    "partial": "The person is implicitly known, but the budget figure, KPI and allocation are not set up",
+    "none": "Nobody looks at it regularly"
+   },
+   "recommend": {
+    "label": "PO as cost owner, infra owner as the hands-on person, a 15-minute monthly review, plus Budgets / Anomaly Detection",
+    "why": "Automate budget alerts and tagging and the review fits in 15 minutes.",
+    "steps": [
+     "Name {po} as the cost owner and {infra_owner} as the hands-on person, and write it in docs/raci.md",
+     "Set a monthly budget in AWS Budgets with 80% / 100% notifications sent to {chat} (SNS to AWS Chatbot). Check current pricing on the official page",
+     "Enable Cost Anomaly Detection per service",
+     "Activate cost allocation tags (Environment/Service/Owner) and enforce them with default tags in your IaC",
+     "Reduce the KPI to one, monthly AWS cost divided by MAU (or monthly orders), and record it every month"
+    ],
+    "effort": "S",
+    "priority": "P2",
+    "owner": "PO + Infra owner"
+   },
+   "alternatives": [
+    {
+     "label": "CUR + QuickSight/Athena for detailed analysis",
+     "when": "When the monthly bill grows and you need a detailed split by feature",
+     "tradeoff": "Large effort to build and run"
+    },
+    {
+     "label": "An external FinOps tool",
+     "when": "When you want to manage several clouds / SaaS in one place",
+     "tradeoff": "Monthly fee, and access has to be granted"
+    }
+   ],
+   "org_shape": "Cost owner={po} / hands-on={infra_owner}. Budgets and Anomaly Detection notify {chat}. 15-minute monthly review. KPI = AWS cost / MAU. Allocation by tags."
+  },
+  {
+   "id": "C-COST-CULTURE",
+   "order": 61,
+   "title": "Cost awareness, policies and clean-up routine",
+   "pillars": [
+    "costOptimization"
+   ],
+   "why": "Cost is decided when you build something and when you finish using it. Keep it going with light rules.",
+   "ask": "Do you have habits of cost awareness (estimating at design time, reviewing regularly), policies (for example stop test environments at night, tags required), and a way to take stock of unneeded resources?",
+   "ladder": {
+    "full": "Policies are written down and automated, a monthly inventory is done, and cost is part of design and review",
+    "partial": "People are aware, but policies and inventory depend on individuals and happen irregularly",
+    "none": "Nothing in particular"
+   },
+   "recommend": {
+    "label": "Three cost policy rules, a monthly inventory (unused EBS / EIPs / snapshots / stopped environments), and a check when a project ends",
+    "why": "Keep the rules few and add automatic detection.",
+    "steps": [
+     "Three rules: (1) every resource must be tagged (2) test environments are stopped at night and on holidays (3) delete what is no longer needed by its deadline",
+     "Monthly inventory (15 minutes): look at the top services in Cost Explorer, unused resources, and snapshot / log retention",
+     "Add one line, 'monthly cost impact', to the PR template for new features",
+     "For finished experiments and projects, complete the deletion with a checklist in {ticket}"
+    ],
+    "effort": "S",
+    "priority": "P3",
+    "owner": "Infra owner"
+   },
+   "alternatives": [
+    {
+     "label": "Detect unused resources automatically with AWS Config / Trusted Advisor",
+     "when": "When the number of resources grows and checking by eye gets hard",
+     "tradeoff": "May need Business support or higher, or extra setup"
+    }
+   ],
+   "org_shape": "Three cost policy rules (tags required / stop test environments / deletion deadline). 15-minute monthly inventory. A cost-impact field in the PR template."
+  },
+  {
+   "id": "C-COST-DESIGN",
+   "order": 62,
+   "title": "Cost evaluation at design time, pricing models and contracts",
+   "pillars": [
+    "costOptimization"
+   ],
+   "why": "Knowing which parts will be expensive at the point where you choose the architecture leaves much more room to cut later.",
+   "ask": "When choosing services or an architecture, do you work out cost requirements, estimate cost per component, take into account how usage varies over time, and check the terms of licenses (OS / DB) and third-party contracts?",
+   "ladder": {
+    "full": "For each choice, the cost requirements, estimate and license terms are recorded, and variation in usage is taken into account",
+    "partial": "The main parts are estimated, but not systematically",
+    "none": "Choices are made without estimating"
+   },
+   "recommend": {
+    "label": "Attach a monthly estimate (Pricing Calculator) to architecture-change PRs, and focus the evaluation on the top cost drivers (data transfer / NAT / DB)",
+    "why": "Getting the top three cost drivers right captures most of the benefit.",
+    "steps": [
+     "Add a 'monthly cost estimate (fixed / variable) and assumptions (MAU, request count)' field to the ADR / PR template",
+     "For the top cost drivers (RDS / compute / NAT and data transfer), estimate how sensitive the cost is to changed assumptions (x2, x5)",
+     "For DB / OS licenses, compare license-included against BYOL and check whether an open-source alternative is possible",
+     "For third-party contracts (SaaS / Marketplace), check the terms every year (minimum commitment, auto-renewal)"
+    ],
+    "effort": "M",
+    "priority": "P3",
+    "owner": "Dev lead"
+   },
+   "alternatives": [
+    {
+     "label": "Estimates that assume Savings Plans / RIs",
+     "when": "When usage has stabilized and you can see one to three years ahead",
+     "tradeoff": "Commitment risk"
+    }
+   ],
+   "org_shape": "Monthly estimate field in the ADR / PR template. Sensitivity of the top cost drivers is estimated. Licenses and third-party contracts are checked yearly."
+  },
+  {
+   "id": "C-SUS-GOALS",
+   "order": 70,
+   "title": "Sustainability goals and optimization policy",
+   "pillars": [
+    "sustainability"
+   ],
+   "why": "Even when it is a low priority, deciding what you will and will not do makes the verdict clear. Most of the measures overlap with cost reduction.",
+   "ask": "Do you have goals or a policy for sustainability (environmental impact)? What is your approach to efficiency (adopting Graviton, right-sizing, buffering, Region selection)?",
+   "ladder": {
+    "full": "Goals are set and shared, and efficiency measures are planned and measured",
+    "partial": "No goals, but efficiency work is done as part of cost reduction",
+    "none": "Not considered",
+    "na": "Sustainability items have no business requirement and do not apply (record the reason and exclude them)"
+   },
+   "recommend": {
+    "label": "Take 'cost reduction = lower environmental impact' as the position, and make Graviton / right-sizing / night shutdown the policy. The device and accelerator items do not apply",
+    "why": "For a small team, the realistic way is to align with cost optimization through the same measures rather than set separate goals.",
+    "steps": [
+     "Write the policy in one line: 'Make Graviton the default and minimize resources through right-sizing, automatic shutdown and deleting unneeded data'",
+     "Make arm64 (Graviton) the default for new work after checking compatibility. Act on Compute Optimizer recommendations monthly",
+     "If you are mainly a backend and have no requirement for end-user device optimization or dedicated accelerators, mark those items N/A",
+     "If you need to explain this to customers, share the figures from the AWS Customer Carbon Footprint Tool"
+    ],
+    "effort": "S",
+    "priority": "P3",
+    "owner": "Infra owner"
+   },
+   "alternatives": [
+    {
+     "label": "Set sustainability goals and measure them",
+     "when": "When customers start asking for it (ESG)",
+     "tradeoff": "Measuring and reporting take effort"
+    }
+   ],
+   "org_shape": "Policy: Graviton default, right-sizing, automatic shutdown, delete unneeded data (the same measures as cost optimization). Devices / accelerators are N/A.",
+   "na_ok": true
+  },
+  {
+   "id": "C-SUS-DATA",
+   "order": 71,
+   "title": "Efficient data design (access patterns, data movement, backup scope)",
+   "pillars": [
+    "sustainability"
+   ],
+   "why": "Cutting the data you keep and move also cuts cost directly.",
+   "ask": "Have you reviewed where data is placed and how it is accessed (caching, less data transfer, leaving re-creatable data out of backups, using shared storage)?",
+   "ladder": {
+    "full": "Design has been reviewed based on access patterns, and unneeded data movement and backups have been reduced",
+    "partial": "Only some optimizations, no systematic review",
+    "none": "Not reviewed"
+   },
+   "recommend": {
+    "label": "Add 're-creatable? / retention period / storage class' to the data inventory and review it every half year",
+    "why": "Extending the data inventory from C-SEC-DATA-CLASS gives you the grounds for optimization at no extra cost.",
+    "steps": [
+     "Add 'is it re-creatable (cache / temp files / derived data)?' and 'access frequency' to the data inventory",
+     "Exclude re-creatable data from backups and set S3 lifecycle rules (IA / Glacier / delete)",
+     "Use CloudFront and caches (ElastiCache and similar), and cut data transfer and NAT cost with VPC endpoints",
+     "In the half-yearly review, move data whose access has dropped to a cheaper tier"
+    ],
+    "effort": "S",
+    "priority": "P3",
+    "owner": "Infra owner"
+   },
+   "alternatives": [
+    {
+     "label": "Make S3 Intelligent-Tiering the default",
+     "when": "When access patterns are unknown or change over time",
+     "tradeoff": "For small objects the monitoring fee can be relatively high"
+    }
+   ],
+   "org_shape": "Re-creatable? / access frequency added to the data inventory. Re-creatable data is excluded from backups; S3 is tiered by lifecycle."
+  }
+ ]
+}
