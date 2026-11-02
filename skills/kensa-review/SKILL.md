@@ -79,10 +79,10 @@ First, say in one sentence what you are going to do. Then run `W init`, and go t
 - If you cannot read the live AWS environment, run `W mode iac` here (after `seed`; `W mode` shows the current value and `W mode both` switches back; the mode is stored in the worklist and survives a re-seed).
 - `W plan` prints the counts per route and the next steps.
 
-**Important**: items often written off as "not checkable in AWS (AWSCheckable=No)" can still be largely reached with evidence. `routing.json` decides the route (aws / repo / interview) for each QuestionId/ChoiceId (`references/evidence-routing.md`). `W coverage` shows the breakdown. For the 158 "No" items in the sample:
-- **Decided (81)**: can be judged from AWS and repository evidence (encryption, network defense, logging/detection, secrets, CI/test automation, and so on).
+**Important**: items often written off as "not checkable in AWS" can still be largely reached with evidence. `routing.json` decides the route (aws / repo / interview) for each QuestionId/ChoiceId (`references/evidence-routing.md`). `W coverage` shows the breakdown. For the standard lens (version 2025-02-25, 307 items; `W coverage` prints the real counts for the lens you use):
+- **Decided (226)**: can be judged from AWS and repository evidence (encryption, network defense, logging/detection, secrets, CI/test automation, and so on).
 - **Draft (40)**: the evidence shows that something exists, but a person must confirm how it is really run and its quality (post-mortems, runbooks, escalation, threat models, DR plans, game days, and so on). Pre-fill the evidence in the card so that only confirmation is needed.
-- **Interview only (37)**: culture, priorities, management involvement and the like, which only a person can answer. The existence of documents, regular meetings or training that do not appear in AWS or the repository is also confirmed with a person.
+- **Interview only (41)**: culture, priorities, management involvement and the like, which only a person can answer. The existence of documents, regular meetings or training that do not appear in AWS or the repository is also confirmed with a person.
 **Always fill from evidence before interviewing.**
 
 ### Phase 2: Fill from evidence (AWS and repository)
