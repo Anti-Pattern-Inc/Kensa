@@ -56,6 +56,19 @@ PILLAR_ORDER = ["Security", "Reliability", "Operational Excellence", "Performanc
 PILLAR_ID = {"Operational Excellence": "operationalExcellence", "Security": "security", "Reliability": "reliability",
              "Performance Efficiency": "performance", "Cost Optimization": "costOptimization", "Sustainability": "sustainability"}
 FTR_PILLARS = {"security", "reliability", "operationalExcellence"}
+
+
+def pillars_in(items):
+    """The known pillars in their usual order, then any pillar this version of kensa does not know (a lens update can add one) in first-seen order.
+    Every per-pillar table walks this list, so an unknown pillar is shown and counted instead of silently dropped."""
+    seen = list(dict.fromkeys(i["pillar"] for i in items))
+    return [p for p in PILLAR_ORDER if p in seen] + [p for p in seen if p not in PILLAR_ORDER]
+
+
+def pillar_sort_key(p):
+    return (PILLAR_ORDER.index(p), "") if p in PILLAR_ORDER else (len(PILLAR_ORDER), p or "")
+
+
 LADDER_VERDICT = {"full": "○", "partial": "△", "none": "✗", "na": "N/A"}
 VERDICT_SCORE = {"○": 3, "△": 2, "✗": 1}   # diff: higher = improved, lower = regressed (N/A and undetermined count as a plain "change")
 STALE_DAYS = 180                            # evidence recorded this many days ago or more is due for re-checking
@@ -362,8 +375,19 @@ def parse_checklist_csv(path, sheet=0, import_verdicts=False):
     return rows
 
 
-def merge_items(old, rows):
-    """Keep state of known choices; flag new / removed ones (lens updates)."""
+LENS_TEXT_FIELDS = ("question_title", "best_practice", "description")   # what a verdict is about; URLs are refreshed without a flag
+
+
+def _same_text(a, b):
+    return " ".join(str(a or "").split()) == " ".join(str(b or "").split())
+
+
+def merge_items(old, rows, changed=None):
+    """Keep state of known choices; flag new / removed ones (lens updates).
+
+    changed: a list to fill with the ids of known choices whose lens text (question / best practice / description) differs from what is stored.
+    Those items get `lens_changed` = {at, fields}, so that a verdict recorded on the old wording is shown in OpenItems for a re-check.
+    Leave it None when the old and new rows come from different sources (CSV vs W-A Tool word things differently, which would flag everything)."""
     by_id = {i["choice_id"]: i for i in old}
     seen, added = set(), []
     out = []
@@ -371,6 +395,11 @@ def merge_items(old, rows):
         seen.add(row["choice_id"])
         if row["choice_id"] in by_id:
             it = by_id[row["choice_id"]]
+            if changed is not None:
+                diff = [k for k in LENS_TEXT_FIELDS if it.get(k) and row.get(k) and not _same_text(it[k], row[k])]
+                if diff:
+                    it["lens_changed"] = {"at": now_iso(), "fields": diff}
+                    changed.append(row["choice_id"])
             for k in ("question_title", "best_practice", "description", "help_url", "improvement_url", "aws_checkable"):
                 if row.get(k):
                     it[k] = row[k]
@@ -395,6 +424,19 @@ def merge_items(old, rows):
     return out, added, removed
 
 
+def warn_lens_status(meta):
+    """The W-A Tool serves the lens version the workload is on, which is not always the current one. kensa never upgrades it (that is a write)."""
+    status, ver = meta.get("lens_status"), meta.get("lens_version")
+    if not status or status == "CURRENT":
+        return
+    hint = {"NOT_CURRENT": f"this workload's lens review is on version {ver}, which is not the current version, so the questions fetched are those of {ver}, not the newest. "
+                           "kensa does not upgrade it (that writes to the workload): upgrade the lens review in the W-A Tool console, then run `seed --from-wa-tool` again "
+                           "(existing verdicts are kept and new items are flagged new_in_lens)",
+            "DEPRECATED": f"the lens (version {ver}) is deprecated, so AWS may stop serving it: check which lens replaces it before relying on this review",
+            "DELETED": f"the lens (version {ver}) was deleted, so the questions may be incomplete: check which lens replaces it"}.get(status)
+    print(f"warning: the lens status is {status}: " + (hint or f"it is not CURRENT, so these may not be the newest questions (version {ver})"), file=sys.stderr)
+
+
 def cmd_seed(a, st):
     refuse_demo(load_json(st.p_work) or {}, "seed")
     if a.from_csv:
@@ -412,7 +454,9 @@ def cmd_seed(a, st):
         die("specify --from-csv or --from-wa-tool.")
     old_w = load_json(st.p_work)
     old_items = old_w["items"] if old_w else []
-    items, added, removed = merge_items(old_items, rows)
+    same_source = bool(old_w) and (old_w.get("meta") or {}).get("source") == meta.get("source")
+    changed = [] if same_source else None
+    items, added, removed = merge_items(old_items, rows, changed)
     routing = load_routing(st)
     unknown = apply_routing(items, routing)
     meta["seeded_at"] = now_iso()
@@ -421,11 +465,19 @@ def cmd_seed(a, st):
         meta["mode"] = old_w["meta"]["mode"]     # a re-seed for a lens update must not lose the mode
     meta["none_choices"] = meta.get("none_choices") or (old_w or {}).get("meta", {}).get("none_choices", {})
     save_json(st.p_work, {"meta": meta, "items": items})
-    print(f"seeded {len(rows)} best practices (source={meta['source']}, lens_version={meta.get('lens_version')})")
+    print(f"seeded {len(rows)} best practices (source={meta['source']}, lens_version={meta.get('lens_version')}"
+          + (f", lens_status={meta['lens_status']}" if meta.get("lens_status") else "") + ")")
+    warn_lens_status(meta)
     if old_items:
         print(f"  merged into existing worklist: new={len(added)} removed={len(removed)}")
         if added:
             print("  new in lens (routed to interview/generic):", ", ".join(added[:10]) + (" ..." if len(added) > 10 else ""))
+        recheck = [cid for cid in (changed or []) if resolved(next(i for i in items if i["choice_id"] == cid))]
+        if recheck:
+            print(f"  the lens text changed for {len(recheck)} item(s) that already have a verdict (listed in OpenItems for a re-check): "
+                  + ", ".join(recheck[:10]) + (" ..." if len(recheck) > 10 else ""))
+        elif changed is None:
+            print("  (the old worklist came from another source, so changes in the wording were not compared)")
     if unknown:
         print(f"  {len(unknown)} choices have no routing (another lens / new items): {', '.join(unknown[:5])}{' ...' if len(unknown) > 5 else ''}\n"
               f"  → run `route-unknown` for material to classify them; the agent can register routes with `route-apply FILE` (unregistered ones go to individual interviews).")
@@ -472,6 +524,19 @@ def age_days(it):
     if t.tzinfo is None:
         t = t.astimezone()
     return (datetime.datetime.now().astimezone() - t).days
+
+
+def lens_text_changed(it):
+    """True when the lens text of this item changed after its verdict was recorded (a re-seed noticed it) and nobody has re-confirmed it since."""
+    lc = it.get("lens_changed")
+    if not lc or it.get("verdict") is None:
+        return False
+    try:
+        at = datetime.datetime.fromisoformat(lc["at"])
+        ev = datetime.datetime.fromisoformat(it["evidence_at"]) if it.get("evidence_at") else None
+    except (ValueError, KeyError, TypeError):
+        return True
+    return ev is None or ev < at
 
 
 def is_stale(it, days=STALE_DAYS):
@@ -928,7 +993,11 @@ def cmd_plan(a, st):
     steps.append(f"`finalize` marks undetermined items as '{EN['ch']['assumed']}' (✗); then `export --format xlsx`")
     steps = [f"{n}. {t}" for n, t in enumerate(steps, 1)]
     tiers = collections.Counter(tier(i) for i in items)
-    out = {"total": tot, "resolved": res, "primary_channel": dict(by_ch), "tiers": dict(tiers), "scans": sc, "mode": review_mode(w),
+    lens_status = w["meta"].get("lens_status")
+    if lens_status and lens_status != "CURRENT":
+        steps.insert(0, f"0. The lens status is {lens_status} (lens version {w['meta'].get('lens_version')}): these may not be the newest questions. "
+                        "Upgrade the lens review in the W-A Tool console, then run `seed --from-wa-tool` again (see the warning `seed` printed)")
+    out = {"total": tot, "resolved": res, "primary_channel": dict(by_ch), "tiers": dict(tiers), "scans": sc, "mode": review_mode(w), "lens_status": lens_status,
            "pending_cards": [c["id"] for c, _ in pend], "waiting_for_scan": len(waiting), "next_steps": steps}
     if a.json:
         print(json.dumps(out, ensure_ascii=False, indent=1))
@@ -953,10 +1022,8 @@ def cmd_status(a, st):
     w = st.work()
     items = active(w)
     print("pillar".ljust(26), "○".rjust(4), "△".rjust(4), "✗".rjust(4), "N/A".rjust(4), "undetermined".rjust(12), "assumed".rjust(8))
-    for p in PILLAR_ORDER:
+    for p in pillars_in(items):
         its = [i for i in items if i["pillar"] == p]
-        if not its:
-            continue
         c = verdict_counts(its)
         assumed = sum(1 for i in its if i.get("channel") == "assumed")
         print(p.ljust(26), str(c["○"]).rjust(4), str(c["△"]).rjust(4), str(c["✗"]).rjust(4), str(c["N/A"]).rjust(4), str(c["undetermined"]).rjust(12), str(assumed).rjust(8))
@@ -1123,11 +1190,10 @@ def cmd_coverage(a, st):
     scope_name = "AWSCheckable=No items" if only_no and not a.all else "all items"
     scope = only_no if only_no and not a.all else items
     rows = collections.OrderedDict()
-    for p in PILLAR_ORDER:
+    for p in pillars_in(scope):
         its = [i for i in scope if i["pillar"] == p]
-        if its:
-            c = collections.Counter(tier(i) for i in its)
-            rows[p] = {"decide": c["decide"], "draft": c["draft"], "ask": c["ask"], "total": len(its)}
+        c = collections.Counter(tier(i) for i in its)
+        rows[p] = {"decide": c["decide"], "draft": c["draft"], "ask": c["ask"], "total": len(its)}
     tot = collections.Counter(tier(i) for i in scope)
     n = len(scope) or 1
     out = {"scope": scope_name, "total": len(scope), "decide": tot["decide"], "draft": tot["draft"], "ask": tot["ask"],
@@ -1501,7 +1567,7 @@ def cmd_export(a, st):
     ctx = st.ctx()
     lang = st.lang
     t = i18n.labels(lang)
-    items = sorted(active(w), key=lambda i: (PILLAR_ORDER.index(i["pillar"]) if i["pillar"] in PILLAR_ORDER else 99, i["question_id"], i["choice_id"]))
+    items = sorted(active(w), key=lambda i: (pillar_sort_key(i["pillar"]), i["question_id"], i["choice_id"]))
     if a.format == "csv":
         with open(a.out, "w", encoding="utf-8-sig", newline="") as f:
             wr = csv.writer(f)
@@ -1578,13 +1644,11 @@ def cmd_export(a, st):
         c.fill, c.font, c.alignment, c.border = hdr_fill, hdr_font, Alignment(wrap_text=True, horizontal="center"), border
     est = estimate_risk(items)
     r0 = 5
-    for n, p in enumerate(PILLAR_ORDER):
-        if not any(i["pillar"] == p for i in items):
-            continue
+    for p in pillars_in(items):
         r = ws_sum.max_row + 1
         ws_sum.append([p] + [f'=COUNTIFS(Checklist!$A:$A,$A{r},Checklist!$H:$H,"{v}")' for v in ("○", "△", "✗", "N/A", t["undetermined"])] +
                       [f"=SUM(B{r}:F{r})", f'=COUNTIFS(Checklist!$A:$A,$A{r},Checklist!$I:$I,"{assumed_label}")',
-                       t["ftr_required"] if PILLAR_ID[p] in FTR_PILLARS else "-",
+                       t["ftr_required"] if PILLAR_ID.get(p) in FTR_PILLARS else "-",
                        len({i["question_id"] for i in items if i["pillar"] == p}), est[p]["HIGH"], est[p]["UNRESOLVED"]])
         for col, f in ((13, f"=IF(G{r}=0,0,(G{r}-F{r})/G{r})"), (14, f"=IF(G{r}=0,0,(G{r}-F{r}-H{r})/G{r})")):
             ws_sum.cell(row=r, column=col, value=f).number_format = "0%"
@@ -1644,6 +1708,8 @@ def cmd_export(a, st):
             reason = t["oi_assumed"]
         elif it.get("channel") == "imported":
             reason = t["oi_imported"]
+        elif lens_text_changed(it):
+            reason = t["oi_lens_changed"].format(fields=", ".join(t["lens_fields"].get(f, f) for f in it["lens_changed"]["fields"]))
         elif it["route"].get("draft") and it.get("channel") in ("aws", "repo"):
             reason = t["oi_draft"]
         elif it.get("basis") == "iac_only":
@@ -1665,7 +1731,7 @@ def cmd_export(a, st):
     wsa = wb.create_sheet("ActionPlan")
     header(wsa, t["ap_hdr"], [8, 18, 22, 36, 38, 8, 60, 44, 7, 16, 16, 12, 10])
     act = [i for i in items if i.get("verdict") in ("△", "✗") or (i.get("verdict") is None and i.get("prefilled"))]
-    act.sort(key=lambda i: (i.get("priority") or "P9", PILLAR_ORDER.index(i["pillar"]) if i["pillar"] in PILLAR_ORDER else 99, i["question_id"]))
+    act.sort(key=lambda i: (i.get("priority") or "P9", pillar_sort_key(i["pillar"]), i["question_id"]))
     for it in act:
         status = it.get("action_status")
         status_code = (i18n.norm_action_status(status) or status) if status else ACTION_STATUSES[0]    # stored code (or an old Japanese label)

@@ -120,6 +120,8 @@ LABELS = {
         "oi_assumed": "Assumed because neither evidence nor an answer was obtained. Check the current state in AWS, the repository "
                       "or with the owner, then update.",
         "oi_imported": "Verdict imported from another environment. Re-check it in the live environment.",
+        "oi_lens_changed": "The wording of this item changed in the lens ({fields}) after the verdict was recorded. Read it again and re-check the verdict.",
+        "lens_fields": {"question_title": "question", "best_practice": "best practice", "description": "description"},
         "oi_draft": "Draft from evidence. Its existence was confirmed, but how it is actually operated and its quality were not. "
                     "The owner should confirm it and finalize.",
         "oi_iac_only": "Judged from IaC only (declarations were read; the live AWS environment was not checked). When the live "
@@ -181,6 +183,8 @@ LABELS = {
         "oi_undetermined_scan": "未判定: AWS/リポジトリのスキャン結果から判定(スキャン不可なら個別に質問)",
         "oi_assumed": "証跡も回答も得られず仮置き。AWS/リポジトリ/担当者で現状を確認して更新",
         "oi_imported": "別環境の判定を取り込んだ値。実環境で再確認",
+        "oi_lens_changed": "判定を記録した後に、レンズ側でこの項目の文言が変わった({fields})。読み直して判定を再確認",
+        "lens_fields": {"question_title": "質問", "best_practice": "ベストプラクティス", "description": "説明"},
         "oi_draft": "証跡からの下書き。『ある』ことは確認できたが、運用の実態・品質は未確認。担当者が確認して確定",
         "oi_iac_only": "IaC だけで判定(宣言を読んだだけで、AWS の実環境は未確認)。実環境を読める時に `mode both` → `scan-aws` で確認。"
                        "手作業の変更・別スタックとの差(ドリフト)に注意",

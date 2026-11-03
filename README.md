@@ -98,7 +98,7 @@ Details are in the [design notes](docs/design.md).
 2. **Ask by "decision card", not by item**: the items that need an interview are grouped into 30 cards. For each card you only pick the current state (○/△/✗), and it comes with a recommendation (steps, effort, priority, owner) and alternatives.
 3. **Never invent facts**: an item with no evidence and no answer is not marked ○; it becomes `✗ / assumed (needs confirmation) / Confidence Low`. A self-reported ○ stops at Confidence Medium.
 4. **Live environment first**: if the IaC and the live environment disagree, the live environment wins and the difference is recorded in Notes.
-5. **The latest lens**: the latest questions and choices are fetched from the W-A Tool. For another lens, or for items missing from the routing table, the agent can classify them and import them.
+5. **Following lens updates**: the questions and choices are fetched from the W-A Tool for every pillar the lens has. kensa warns when the workload is not on the current lens version, flags items whose wording changed after you answered them, and keeps a new pillar visible. For another lens, or for items missing from the routing table, the agent can classify them and import them.
 6. **Re-review**: `snapshot` and `diff` show what got worse, what improved, what has been confirmed since, lens changes, and stale evidence.
 7. **Do not mix "unconfirmed" with "not done"**: the recorded rate and the confirmed rate are reported separately, and you can choose not to send assumed items to the W-A Tool.
 8. **Works without access to AWS**: `mode iac` judges from IaC and the repository alone (Confidence up to Medium).

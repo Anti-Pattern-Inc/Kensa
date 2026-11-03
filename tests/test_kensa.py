@@ -599,23 +599,55 @@ class WaTool(unittest.TestCase):
         self.assertEqual(calls[0]["WorkloadId"], "w")
 
     def test_fetch_pagination_and_none_choice(self):
-        pages = {"security": [{"AnswerSummaries": [{"QuestionId": "q1", "QuestionTitle": "T", "PillarId": "security", "Risk": "UNANSWERED",
-                                                    "Choices": [{"ChoiceId": "c1", "Title": "BP1", "Description": "D", "HelpfulResource": {"Url": "u"}},
-                                                                {"ChoiceId": "q1_none", "Title": "None of these"}]}], "NextToken": "n"},
-                              {"AnswerSummaries": [{"QuestionId": "q2", "QuestionTitle": "T2", "PillarId": "security", "Choices": [{"ChoiceId": "c2", "Title": "BP2"}]}]}]}
+        pages = [{"AnswerSummaries": [{"QuestionId": "q1", "QuestionTitle": "T", "PillarId": "security", "Risk": "UNANSWERED",
+                                       "Choices": [{"ChoiceId": "c1", "Title": "BP1", "Description": "D", "HelpfulResource": {"Url": "u"}},
+                                                   {"ChoiceId": "q1_none", "Title": "None of these"}]}], "NextToken": "n"},
+                 {"AnswerSummaries": [{"QuestionId": "q2", "QuestionTitle": "T2", "PillarId": "security", "Choices": [{"ChoiceId": "c2", "Title": "BP2"}]}]}]
+        asked = []
 
         class C:
             def get_lens_review(self, **kw):
-                return {"LensReview": {"LensVersion": "2025-02-25"}}
+                return {"LensReview": {"LensVersion": "2025-02-25", "LensStatus": "CURRENT"}}
 
             def list_answers(self, **kw):
-                lst = pages.get(kw["PillarId"], [{"AnswerSummaries": []}])
-                return lst[1] if kw.get("NextToken") else lst[0]
+                asked.append(kw)
+                return pages[1] if kw.get("NextToken") else pages[0]
         items, meta = kensa_wa.fetch("w", c=C())
         self.assertEqual([i["choice_id"] for i in items], ["c1", "c2"])
         self.assertEqual(meta["lens_version"], "2025-02-25")
+        self.assertEqual(meta["lens_status"], "CURRENT")
         self.assertEqual(meta["none_choices"], {"q1": "q1_none"})
         self.assertEqual(items[0]["help_url"], "u")
+        self.assertEqual(len(asked), 2)                                   # one paginated pass over every pillar, not one pass per known pillar
+        self.assertTrue(all("PillarId" not in kw for kw in asked), asked)
+
+    def test_fetch_reads_a_pillar_kensa_does_not_know_and_names_it_from_the_api(self):
+        class C:
+            def get_lens_review(self, **kw):
+                return {"LensReview": {"LensVersion": "2027-01-01", "LensStatus": "CURRENT",
+                                       "PillarReviewSummaries": [{"PillarId": "resilience", "PillarName": "Resilience"},
+                                                                 {"PillarId": "security", "PillarName": "Sicherheit"}]}}
+
+            def list_answers(self, **kw):
+                return {"AnswerSummaries": [
+                    {"QuestionId": "s1", "PillarId": "security", "Choices": [{"ChoiceId": "s1_a", "Title": "A"}]},
+                    {"QuestionId": "r1", "PillarId": "resilience", "Choices": [{"ChoiceId": "r1_a", "Title": "B"}]},
+                    {"QuestionId": "x1", "PillarId": "unlisted", "Choices": [{"ChoiceId": "x1_a", "Title": "C"}]}]}
+        items, _ = kensa_wa.fetch("w", c=C())
+        self.assertEqual({i["choice_id"]: i["pillar"] for i in items},
+                         {"s1_a": "Security",          # a known pillar keeps kensa's stable name whatever language the API answers in
+                          "r1_a": "Resilience",        # an unknown pillar takes the name the W-A Tool gives it
+                          "x1_a": "unlisted"})         # and with no name at all, its id
+
+    def test_fetch_returns_every_lens_status(self):
+        for status in ("CURRENT", "NOT_CURRENT", "DEPRECATED", "DELETED", None):
+            class C:
+                def get_lens_review(self, **kw):
+                    return {"LensReview": {"LensVersion": "v", **({"LensStatus": status} if status else {})}}
+
+                def list_answers(self, **kw):
+                    return {"AnswerSummaries": []}
+            self.assertEqual(kensa_wa.fetch("w", c=C())[1]["lens_status"], status)
 
     def test_precheck(self):
         now = datetime.datetime(2026, 11, 1, tzinfo=datetime.timezone.utc)
@@ -1381,6 +1413,221 @@ class AuthPreflight(Seeded):
                 code, _, err = run(argv, self.d)
             self.assertEqual(code, 3, argv)
             self.assertIn("no credentials were found", err)
+
+
+class LensUpdates(Seeded):
+    """A new W-A lens version: warn when the workload is not on the current one, flag reworded items, and keep unknown pillars visible."""
+
+    OLD_AT = "2026-01-01T00:00:00+09:00"
+
+    def rows_csv(self, mutate=None, extra=()):
+        rows = list(csv.DictReader(io.StringIO(read_text(FIXTURE))))
+        for r in rows:
+            if mutate:
+                mutate(r)
+        rows += list(extra)
+        p = os.path.join(self.tmp.name, "v2.csv")
+        with open(p, "w", encoding="utf-8", newline="") as f:
+            w = csv.DictWriter(f, fieldnames=list(rows[0]))
+            w.writeheader()
+            w.writerows(rows)
+        return p
+
+    def verdict(self, cid, v="○"):
+        code, _, err = self.apply({"choice_id": cid, "verdict": v, "channel": "repo", "confidence": "H", "evidence": "x"})
+        self.assertEqual(code, 0, err)
+        w = self.work()
+        for it in w["items"]:
+            if it["choice_id"] == cid:
+                it["evidence_at"] = self.OLD_AT        # recorded long ago, so that a later change is clearly after it
+        self.save_work(w)
+
+    def reword(self, cid, **fields):
+        return lambda r: r.update(fields) if r["ChoiceId"] == cid else None
+
+    # ---- the lens status
+    def seed_from_wa_tool(self, status, version="2025-02-25"):
+        rows = [{"choice_id": "c1", "question_id": "q1", "pillar": "Security", "question_title": "T", "best_practice": "B", "description": "D",
+                 "aws_checkable": "", "help_url": "", "improvement_url": "", "question_risk": ""}]
+        meta = {"source": "wa-tool", "lens": "wellarchitected", "lens_version": version, "lens_status": status, "workload_id": "w-1",
+                "fetched_at": "2026-11-03T00:00:00+09:00", "none_choices": {}}
+        table = {STS: {"Account": "123456789012", "Arn": "arn:aws:sts::123456789012:assumed-role/WaTool/me"}}
+        with mock.patch.object(kensa_scan, "make_session", lambda profile=None, region=None: FakeSession(table)), \
+                mock.patch.object(kensa_wa, "fetch", return_value=(rows, meta)):
+            return run(["seed", "--from-wa-tool", "--workload-id", "w-1"], self.d)
+
+    def test_a_current_lens_gives_no_warning(self):
+        code, out, err = self.seed_from_wa_tool("CURRENT")
+        self.assertEqual(code, 0, err)
+        self.assertIn("lens_status=CURRENT", out)
+        self.assertNotIn("warning: the lens status", err)
+
+    def test_a_not_current_lens_warns_and_says_what_to_do(self):
+        code, out, err = self.seed_from_wa_tool("NOT_CURRENT", "2024-06-27")
+        self.assertEqual(code, 0, err)                       # a warning, not a failure: the review can go on with the old version
+        self.assertIn("lens_status=NOT_CURRENT", out)
+        self.assertIn("warning: the lens status is NOT_CURRENT", err)
+        self.assertIn("2024-06-27", err)
+        self.assertIn("not the current version", err)
+        self.assertIn("kensa does not upgrade it", err)       # an upgrade writes to the workload, so kensa never does it
+        self.assertIn("upgrade the lens review in the W-A Tool console", err)
+        self.assertEqual(self.work()["meta"]["lens_status"], "NOT_CURRENT")
+
+    def test_deprecated_deleted_and_unknown_statuses_warn_too(self):
+        for status, phrase in (("DEPRECATED", "is deprecated"), ("DELETED", "was deleted"), ("SOMETHING_NEW", "is not CURRENT")):
+            code, _, err = self.seed_from_wa_tool(status)
+            self.assertEqual(code, 0, err)
+            self.assertIn(f"warning: the lens status is {status}", err)
+            self.assertIn(phrase, err)
+
+    def test_plan_keeps_reminding_about_a_lens_that_is_not_current(self):
+        self.seed_from_wa_tool("NOT_CURRENT")
+        _, out, _ = run(["plan"], self.d)
+        self.assertIn("0. The lens status is NOT_CURRENT", out)
+        _, out, _ = run(["plan", "--json"], self.d)
+        j = json.loads(out)
+        self.assertEqual(j["lens_status"], "NOT_CURRENT")
+        self.assertTrue(j["next_steps"][0].startswith("0. "))
+        self.seed_from_wa_tool("CURRENT")                     # once the lens review is upgraded and fetched again, the reminder is gone
+        _, out, _ = run(["plan"], self.d)
+        self.assertNotIn("The lens status is", out)
+
+    def test_a_csv_seed_has_no_lens_status(self):
+        _, out, err = run(["seed", "--from-csv", FIXTURE], self.d)
+        self.assertNotIn("lens_status", out)
+        self.assertNotIn("warning", err)
+
+    # ---- reworded items
+    def test_a_reworded_item_with_a_verdict_is_flagged_for_a_recheck(self):
+        self.verdict("sec_protect_data_rest_encrypt")
+        p = self.rows_csv(self.reword("sec_protect_data_rest_encrypt", Description="a changed description"))
+        code, out, _ = run(["seed", "--from-csv", p], self.d)
+        self.assertEqual(code, 0)
+        self.assertIn("the lens text changed for 1 item(s) that already have a verdict", out)
+        self.assertIn("sec_protect_data_rest_encrypt", out)
+        it = self.item("sec_protect_data_rest_encrypt")
+        self.assertEqual(it["lens_changed"]["fields"], ["description"])
+        self.assertEqual(it["description"], "a changed description")      # the new wording is stored
+        self.assertEqual(it["verdict"], "○")                               # the verdict is kept, only flagged
+        self.assertTrue(kensa.lens_text_changed(it))
+        # the other items were not touched
+        self.assertFalse(any("lens_changed" in i for i in self.work()["items"] if i["choice_id"] != "sec_protect_data_rest_encrypt"))
+
+    def test_whitespace_and_url_changes_are_not_a_reword(self):
+        self.verdict("sec_protect_data_rest_encrypt")
+
+        def tweak(r):
+            if r["ChoiceId"] == "sec_protect_data_rest_encrypt":
+                r["Description"] = "  " + r["Description"].replace(" ", "  ") + "\n"
+        p = self.rows_csv(tweak)
+        _, out, _ = run(["seed", "--from-csv", p], self.d)
+        self.assertNotIn("the lens text changed", out)
+        self.assertNotIn("lens_changed", self.item("sec_protect_data_rest_encrypt"))
+        merged = kensa.merge_items(self.work()["items"], [{**{k: v for k, v in self.item("sec_protect_data_rest_encrypt").items() if k in
+                                                             ("choice_id", "question_id", "pillar", "question_title", "best_practice", "description")},
+                                                           "improvement_url": "https://new.example/plan"}], changed=[])[0]
+        self.assertNotIn("lens_changed", next(i for i in merged if i["choice_id"] == "sec_protect_data_rest_encrypt"))
+
+    def test_a_reworded_item_without_a_verdict_is_not_reported(self):
+        p = self.rows_csv(self.reword("sec_protect_data_rest_encrypt", BestPractice="Another title"))
+        _, out, _ = run(["seed", "--from-csv", p], self.d)
+        self.assertNotIn("the lens text changed", out)       # nothing was recorded on the old wording, so there is nothing to re-check
+        self.assertFalse(kensa.lens_text_changed(self.item("sec_protect_data_rest_encrypt")))
+
+    def test_a_flag_clears_once_the_item_is_confirmed_again(self):
+        self.verdict("sec_protect_data_rest_encrypt")
+        run(["seed", "--from-csv", self.rows_csv(self.reword("sec_protect_data_rest_encrypt", Description="new words"))], self.d)
+        self.assertTrue(kensa.lens_text_changed(self.item("sec_protect_data_rest_encrypt")))
+        w = self.work()
+        for it in w["items"]:
+            if it["choice_id"] == "sec_protect_data_rest_encrypt":
+                it["lens_changed"]["at"] = "2026-02-01T00:00:00+09:00"
+                it["evidence_at"] = "2026-03-01T00:00:00+09:00"       # a verdict recorded after the change
+        self.save_work(w)
+        self.assertFalse(kensa.lens_text_changed(self.item("sec_protect_data_rest_encrypt")))
+
+    def test_the_wording_is_not_compared_when_the_old_worklist_came_from_another_source(self):
+        self.verdict("sec_protect_data_rest_encrypt")
+        rows = list(csv.DictReader(io.StringIO(read_text(FIXTURE))))
+        fetched = [{"choice_id": r["ChoiceId"], "question_id": r["QuestionId"], "pillar": r["Pillar"], "question_title": r["QuestionTitle"],
+                    "best_practice": r["BestPractice"], "description": "worded differently by the W-A Tool", "aws_checkable": "", "help_url": "",
+                    "improvement_url": "", "question_risk": ""} for r in rows]
+        meta = {"source": "wa-tool", "lens": "wellarchitected", "lens_version": "v", "lens_status": "CURRENT", "workload_id": "w-1",
+                "fetched_at": "2026-11-03T00:00:00+09:00", "none_choices": {}}
+        table = {STS: {"Account": "123456789012", "Arn": "arn:aws:sts::123456789012:assumed-role/WaTool/me"}}
+        with mock.patch.object(kensa_scan, "make_session", lambda profile=None, region=None: FakeSession(table)), \
+                mock.patch.object(kensa_wa, "fetch", return_value=(fetched, meta)):
+            code, out, err = run(["seed", "--from-wa-tool", "--workload-id", "w-1"], self.d)
+        self.assertEqual(code, 0, err)
+        self.assertIn("another source", out)
+        self.assertFalse(any("lens_changed" in i for i in self.work()["items"]))     # CSV and W-A Tool word things differently: do not flag them all
+
+    @needs_openpyxl
+    def test_openitems_lists_a_reworded_item_in_both_locales(self):
+        from openpyxl import load_workbook
+        self.verdict("sec_protect_data_rest_encrypt")
+        run(["seed", "--from-csv", self.rows_csv(self.reword("sec_protect_data_rest_encrypt", Description="new words"))], self.d)
+        for lang, phrase in (("en", "wording of this item changed in the lens (description)"), ("ja", "レンズ側でこの項目の文言が変わった(説明)")):
+            out = os.path.join(self.tmp.name, f"o-{lang}.xlsx")
+            code, _, err = run(["export", "--format", "xlsx", "--out", out], self.d, lang=lang)
+            self.assertEqual(code, 0, err)
+            rows = [[c.value for c in r] for r in load_workbook(out)["OpenItems"].iter_rows(min_row=2)]
+            hit = [r for r in rows if r[1] == "sec_protect_data_rest_encrypt"]
+            self.assertEqual(len(hit), 1, rows)
+            self.assertIn(phrase, hit[0][6])
+
+    # ---- a pillar kensa does not know
+    NEW_PILLAR = {"Pillar": "Resilience", "QuestionId": "resi-1", "QuestionTitle": "A question in a new pillar", "ChoiceId": "resi_1_1",
+                  "BestPractice": "A best practice in a new pillar", "Description": "synthetic", "AWSCheckable": ""}
+
+    def seed_with_new_pillar(self):
+        code, out, err = run(["seed", "--from-csv", self.rows_csv(extra=[self.NEW_PILLAR])], self.d)
+        self.assertEqual(code, 0, err)
+
+    def test_pillars_in_and_sort_key_put_unknown_pillars_last_and_grouped(self):
+        items = [{"pillar": p} for p in ("Zeta", "Cost Optimization", "Alpha", "Security", "Zeta")]
+        self.assertEqual(kensa.pillars_in(items), ["Security", "Cost Optimization", "Zeta", "Alpha"])   # known order, then first-seen
+        self.assertEqual(sorted(["Zeta", "Alpha", "Sustainability", "Security"], key=kensa.pillar_sort_key), ["Security", "Sustainability", "Alpha", "Zeta"])
+
+    def test_status_and_coverage_show_an_unknown_pillar(self):
+        self.seed_with_new_pillar()
+        _, out, _ = run(["status"], self.d)
+        self.assertIn("Resilience", out)
+        _, out, _ = run(["coverage", "--all", "--json"], self.d)
+        j = json.loads(out)
+        self.assertIn("Resilience", j["by_pillar"])
+        self.assertEqual(sum(v["total"] for v in j["by_pillar"].values()), j["total"])      # nothing is dropped from the total
+
+    def test_csv_export_keeps_an_unknown_pillar_after_the_known_ones(self):
+        self.seed_with_new_pillar()
+        run(["finalize", "--allow-empty"], self.d)
+        out = os.path.join(self.tmp.name, "o.csv")
+        run(["export", "--format", "csv", "--out", out], self.d)
+        pillars = [r[0] for r in csv.reader(io.StringIO(read_text(out, "utf-8-sig")))][1:]
+        self.assertEqual(pillars[-1], "Resilience")
+        self.assertEqual(len(pillars), 13)
+
+    @needs_openpyxl
+    def test_xlsx_summary_has_a_row_for_an_unknown_pillar_and_counts_it_in_the_total(self):
+        from openpyxl import load_workbook
+        self.seed_with_new_pillar()
+        run(["finalize", "--allow-empty"], self.d)
+        out = os.path.join(self.tmp.name, "o.xlsx")
+        code, _, err = run(["export", "--format", "xlsx", "--out", out], self.d)
+        self.assertEqual(code, 0, err)
+        wb = load_workbook(out)
+        rows = [[c.value for c in r] for r in wb["Summary"].iter_rows(min_row=5, max_row=20)]
+        names = [r[0] for r in rows if r[0]]
+        self.assertIn("Resilience", names)
+        self.assertLess(names.index("Security"), names.index("Resilience"))
+        total_row = next(r for r in rows if r[0] and str(r[0]).startswith(("Total", "合計")))
+        pillar_rows = [r for r in rows if r[0] in names[:names.index(total_row[0])]]
+        self.assertEqual(len(pillar_rows), len(names[:names.index(total_row[0])]))
+        res = next(r for r in rows if r[0] == "Resilience")
+        self.assertEqual(res[6], "=SUM(B{0}:F{0})".format(rows.index(res) + 5))                # the same per-pillar formulas as the known pillars
+        sec = next(r for r in rows if r[0] == "Security")
+        self.assertEqual(sec[6], "=SUM(B{0}:F{0})".format(rows.index(sec) + 5))
+        self.assertTrue(any(c.value == "Resilience" for r in wb["Checklist"].iter_rows(min_row=2) for c in r[:1]))
 
 
 class AdminHint(Seeded):

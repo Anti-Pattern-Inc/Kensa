@@ -21,7 +21,7 @@
 A W-A review works best when repeated, for example every quarter, rather than done once. If `.kensa/` is still there, update only the differences **instead of starting over**.
 
 1. Save the previous state: `W snapshot --label 2026Q4` (stored in `.kensa/history/`; take one when the first review ends, too).
-2. Pull in lens updates: `W seed --from-wa-tool --workload-id <workload-id>` (keeps existing verdicts and marks added or removed items). New items start from the Phase 1 routing (`route-unknown`).
+2. Pull in lens updates: `W seed --from-wa-tool --workload-id <workload-id>` (keeps existing verdicts and marks added or removed items). New items start from the Phase 1 routing (`route-unknown`). If `seed` warns that the lens status is not `CURRENT`, have the user upgrade the lens review in the W-A Tool console first, then seed again. Items whose lens wording changed after their verdict was recorded appear in OpenItems for a re-check.
 3. Rescan: `W scan-repo`, `W scan-aws`. Record with `apply` (new evidence of equal or higher strength replaces the old value. A person's answer is overwritten by strong AWS/repository evidence (a route that is not `draft`), but not by weak or draft evidence. Use `--force` only when you mean to change it).
 4. Look at the difference with `W diff`. Report **regressions (○→△/✗)** first. Then improvements, items whose confirmation progressed, lens additions and removals, and **items with stale evidence** (180 days by default; change with `--stale-days`; `--json` for all of them). Stale items also appear in OpenItems.
 5. Update the progress of fixes with `action_status` / `due` in `apply`, and share with `W export`.

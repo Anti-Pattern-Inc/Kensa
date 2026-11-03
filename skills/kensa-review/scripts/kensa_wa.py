@@ -11,7 +11,6 @@ import time
 
 import kensa_i18n as i18n
 
-PILLAR_IDS = ["operationalExcellence", "security", "reliability", "performance", "costOptimization", "sustainability"]
 PILLAR_NAMES = {
     "operationalExcellence": "Operational Excellence", "security": "Security", "reliability": "Reliability",
     "performance": "Performance Efficiency", "costOptimization": "Cost Optimization", "sustainability": "Sustainability",
@@ -39,35 +38,40 @@ def client(region=None, profile=None):
 
 
 def fetch(workload_id, lens="wellarchitected", c=None, region=None, profile=None):
-    """Return (items, meta) with every best practice of the lens as currently served by the WA Tool."""
+    """Return (items, meta) with every best practice of the lens review as the W-A Tool serves it for this workload.
+
+    That is the lens version the workload is on, which is not always the newest one (a workload stays on its version until the lens review is
+    upgraded), so meta["lens_status"] (CURRENT / NOT_CURRENT / DEPRECATED / DELETED) is returned for the caller to warn about.
+    ListAnswers is called without PillarId so that a pillar added by a lens update is fetched too (a pillar kensa does not know keeps the name the W-A Tool gives it)."""
     c = c or client(region, profile)
     lr = c.get_lens_review(WorkloadId=workload_id, LensAlias=lens)["LensReview"]
+    api_names = {s_["PillarId"]: s_.get("PillarName") for s_ in lr.get("PillarReviewSummaries", []) if s_.get("PillarId")}
     items, none_choices = [], {}
-    for pid in PILLAR_IDS:
-        token = None
-        while True:
-            kw = dict(WorkloadId=workload_id, LensAlias=lens, PillarId=pid, MaxResults=50)
-            if token:
-                kw["NextToken"] = token
-            resp = c.list_answers(**kw)
-            for a in resp.get("AnswerSummaries", []):
-                for ch in a.get("Choices", []):
-                    if NONE_TITLE.search(ch.get("Title", "")):
-                        none_choices[a["QuestionId"]] = ch["ChoiceId"]
-                        continue
-                    items.append({
-                        "choice_id": ch["ChoiceId"], "question_id": a["QuestionId"],
-                        "pillar": PILLAR_NAMES.get(a.get("PillarId", pid), pid),
-                        "question_title": a.get("QuestionTitle", ""), "best_practice": ch.get("Title", ""),
-                        "description": ch.get("Description", ""), "aws_checkable": "",
-                        "help_url": (ch.get("HelpfulResource") or {}).get("Url", ""),
-                        "improvement_url": (ch.get("ImprovementPlan") or {}).get("Url", ""),
-                        "question_risk": a.get("Risk", ""),
-                    })
-            token = resp.get("NextToken")
-            if not token:
-                break
-    meta = {"source": "wa-tool", "lens": lens, "lens_version": lr.get("LensVersion"), "workload_id": workload_id,
+    token = None
+    while True:
+        kw = dict(WorkloadId=workload_id, LensAlias=lens, MaxResults=50)
+        if token:
+            kw["NextToken"] = token
+        resp = c.list_answers(**kw)
+        for a in resp.get("AnswerSummaries", []):
+            pid = a.get("PillarId", "")
+            for ch in a.get("Choices", []):
+                if NONE_TITLE.search(ch.get("Title", "")):
+                    none_choices[a["QuestionId"]] = ch["ChoiceId"]
+                    continue
+                items.append({
+                    "choice_id": ch["ChoiceId"], "question_id": a["QuestionId"],
+                    "pillar": PILLAR_NAMES.get(pid) or api_names.get(pid) or pid,
+                    "question_title": a.get("QuestionTitle", ""), "best_practice": ch.get("Title", ""),
+                    "description": ch.get("Description", ""), "aws_checkable": "",
+                    "help_url": (ch.get("HelpfulResource") or {}).get("Url", ""),
+                    "improvement_url": (ch.get("ImprovementPlan") or {}).get("Url", ""),
+                    "question_risk": a.get("Risk", ""),
+                })
+        token = resp.get("NextToken")
+        if not token:
+            break
+    meta = {"source": "wa-tool", "lens": lens, "lens_version": lr.get("LensVersion"), "lens_status": lr.get("LensStatus"), "workload_id": workload_id,
             "fetched_at": _now().isoformat(timespec="seconds"), "none_choices": none_choices}
     return items, meta
 

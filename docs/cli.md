@@ -15,7 +15,7 @@ $W init                                            # (if .kensa/ already holds a
 $W context set service.name="…" team.size=4 tools.chat=Slack aws.regions='["ap-northeast-1"]' repo.github=owner/repo
 $W business show                                   # the 9 business-requirement questions (with recommendations)
 $W business answer B-CRITICALITY --option high
-$W seed --from-wa-tool --workload-id <workload-id>   # the latest lens (or --from-csv). The ID is 32 hex digits (printed by `workload-create`)
+$W seed --from-wa-tool --workload-id <workload-id>   # the workload's lens (warns if it is not the current version; or --from-csv). The ID is 32 hex digits (printed by `workload-create`)
 $W coverage                                        # breakdown: decided / draft / interview only
 $W scan-repo --path . --gh owner/repo              # IaC, documents, GitHub settings and the last 90 days of activity, CI
 $W context set aws.profile=kensa-scan aws.wa_profile=kensa-wa     # profile for reading / profile for the W-A Tool (wa_profile is optional)

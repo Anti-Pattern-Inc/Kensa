@@ -15,7 +15,7 @@ $W init                                            # (.kensa/ に進行中のレ
 $W context set service.name="…" team.size=4 tools.chat=Slack aws.regions='["ap-northeast-1"]' repo.github=owner/repo
 $W business show                                   # ビジネス要件9問(推奨付き)
 $W business answer B-CRITICALITY --option high
-$W seed --from-wa-tool --workload-id <workload-id>   # 最新のレンズ(または --from-csv)。ID は 32 桁の 16 進数(`workload-create` が出す)
+$W seed --from-wa-tool --workload-id <workload-id>   # ワークロードのレンズ(最新でなければ警告。または --from-csv)。ID は 32 桁の 16 進数(`workload-create` が出す)
 $W coverage                                        # 確定 / 下書き / 面談のみ の内訳
 $W scan-repo --path . --gh owner/repo              # IaC・文書・GitHub の設定と直近90日の活動実績・CI
 $W context set aws.profile=kensa-scan aws.wa_profile=kensa-wa     # 読む用 / W-A Tool に触る用(wa_profile は任意)
