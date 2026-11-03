@@ -39,7 +39,7 @@ You do not need all of it on day one. Each level adds capability; the review wor
 | **Lv1** | A **read-only** AWS profile | Adds the live-environment scan (`scan-aws`, 37 checks) | Deploy [`iam/scan-role.yaml`](../iam/scan-role.yaml) ([explanation](aws-iam.md)); `context set aws.profile=…`; `auth-check` |
 | **Lv2** | A **W-A Tool** profile (separate from the read-only one) | Fetches the latest lens from your workload (`seed --from-wa-tool`), records answers (`push`), FTR pre-check, creates workloads | Same template with `CreateWaToolRole=true`; `context set aws.wa_profile=…`; `auth-check --for wa` |
 
-Start with a test account and a test workload, and never with an administrator profile ([README → What to know first](../README.md#what-to-know-first)). The agent always shows you the account ID and asks before touching AWS, and `push --apply` is only ever run when you say so.
+Start with a test account and a test workload, and never with an administrator profile ([README → What to know first](../README.md#what-to-know-first)). `auth-check` prints a warning when the credentials look like an administrator; it is a best-effort hint ([Permissions (IAM)](aws-iam.md)), so a quiet result is not proof that the profile is read-only. The agent always shows you the account ID and asks before touching AWS, and `push --apply` is only ever run when you say so.
 
 ## 4. Run a real review
 

@@ -34,6 +34,6 @@
 - 状態ファイルのパーミッションは既定の umask のまま(0600 にしていない)。`scan-repo` はファイルのシンボリックリンクを辿る。
 - **成果物の言語は `en`(既定)と `ja` だけ。** CLI のメッセージ・スキル・参考資料は英語で、エージェントが利用者の言語で伝える。他の言語の成果物は英語で出力され、エージェントが提示時に訳す。日本語の質問カード(`assets/cards.ja.json`)は英語版(`assets/cards.json`)とは別に保守しており、内容がずれることがある。CSV・xlsx の取り込みは、英語と日本語のどちらの列名(`Verdict` / `判定`、`Org shape / tools` / `組織の形、ツール`)も受け付ける。
 - `gh api` は `--method GET` を明示していない(`gh api` の既定は GET)。
-- **`gh skill install` ではスキルだけが入る。** `docs/`・`iam/`・`optional/` は入らない(IAM テンプレートはリポジトリから取得する)。ドキュメント検索の MCP(`aws-docs`)は、どのインストール方法でも任意([AWS MCP Server](aws-mcp.md))。未接続の場合は `improvement_url` を直接開く手順になる。
+- **`gh skill install` ではスキルだけが入る。** `docs/`・`iam/`・`optional/` は入らない(IAM テンプレートはリポジトリから取得する)。ドキュメント検索の MCP(`aws-docs`)は Claude Code 向けに同梱されていて、この方法では入らない。使いたければ `mcp.json` の `mcpServers` を自分で追加する([AWS MCP Server](aws-mcp.md))。未接続の場合は `improvement_url` を直接開く手順になる。
 - Kiro Power としての動作は、実機では未確認([検証状況](verification.md))。
 - `precheck` が確認するのは、ワークロード**名**にソリューション名が含まれるか(`--solution-name` を指定した場合のみ)。AWS はワークロードの説明にソリューション名を書く形も認めているが、`precheck` はそちらを確認しない。

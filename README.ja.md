@@ -77,7 +77,7 @@ GitHub のリポジトリ https://github.com/Anti-Pattern-Inc/Kensa にある、
 - **非公式のプロジェクト**です。AWS による提携・推奨・後援はありません。Amazon Web Services、AWS は Amazon.com, Inc. またはその関連会社の商標です。「Well-Architected」などの AWS のサービス・プログラム名も、各権利者に帰属します。
 - **AWS の文章を同梱していません。** 質問文・ベストプラクティス文は、実行時に利用者自身の W-A Tool から取得します(`seed --from-wa-tool`)。`tests/fixtures/` は、質問タイトルやベストプラクティス名も含めて合成データです(`QuestionId`・`ChoiceId` は経路表のキーなので、実際の識別子を使っています)。`assets/routing.json` の経路分類は本プロジェクトの設計判断で、AWS 公式の分類ではありません(`QuestionId`・`ChoiceId` は経路表のキーとして、AWS の識別子をそのまま使っています)。
 - **実行すると AWS に触れます。** スキャンは読み取りのみですが、`scan-aws` は Cost Explorer の API を数回呼びます(AWS の料金は 1 リクエストあたり 0.01 USD。ページごとに課金)。`push --apply` と `workload-create --apply` は W-A Tool に書き込みます。
-- **既定で有効になる MCP サーバーはありません。** 任意で、AWS が管理する公開エンドポイントへの認証なしのドキュメント検索(`aws-docs`)を追加できます。追加した場合、検索語とページの URL が AWS に送られます(スキャン結果は送りません)。[docs/aws-mcp.md](docs/ja/aws-mcp.md) を参照。
+- **ドキュメント検索の MCP(`aws-docs`)を同梱しており、Claude Code ではプラグインを有効にすると起動します。** AWS が管理する公開エンドポイントへの、認証なし・ドキュメント検索専用の接続で、資格情報は使いません。検索語とページの URL が、インターネット経由で AWS に送られます(スキャン結果は送りません)。`/mcp` から無効にできます。[docs/aws-mcp.md](docs/ja/aws-mcp.md) を参照。
 - **まずテスト用のアカウントとワークロードで。** 管理者権限のプロファイルは使わないでください(エージェントはシェルを持つため、プロファイルの資格情報は他の `aws` コマンドにも使われうる)。読み取り専用ロールのテンプレートは [`iam/scan-role.yaml`](iam/scan-role.yaml)([解説](docs/ja/aws-iam.md))。
 - 本ソフトウェアは現状有姿で提供されます(Apache-2.0)。IAM テンプレートは第三者の監査を受けていません。
 
@@ -114,7 +114,7 @@ GitHub のリポジトリ https://github.com/Anti-Pattern-Inc/Kensa にある、
 - **GitHub CLI(`gh skill`。2.90 以降、プレビュー)**: `gh skill install Anti-Pattern-Inc/Kensa --all --agent claude-code`。`--agent` は `kiro-cli`、`codex`、`cursor` などにも変えられ、`--scope user` で全体に入れる。**入るのは `skills/` の 2 つのスキルだけ**(スクリプト・アセット・参考資料は各スキルの中にある)。`iam/` のテンプレート、`optional/`、`docs/` は入らないので、必要ならリポジトリから取得する。2 つは続けて使う(`kensa-partner-record` は `kensa-review` のスクリプトを使う)ので、`--all` で入れる。
 - **その他の Agent Plugins 対応エージェント**: 同じルートの `plugin.json`・`skills/` を読む。
 - **スクリプトの依存**: xlsx 出力に `openpyxl`、AWS 系のサブコマンドに `boto3`。**`uv` を勧める**: `kensa.py` の先頭に依存と Python の版を書いてあるので、`uv run skills/kensa-review/scripts/kensa.py …` だけで初回に自動取得して動く。`uv` が無ければ `pip install openpyxl boto3` のうえ `python3` で動く。
-- **MCP**: 既定で有効なものはない。認証なしのドキュメント検索(`optional/aws-docs.json`。Claude Code では `claude mcp add --transport http aws-docs https://aws-mcp.us-east-1.api.aws/mcp`)と、IAM 認証つきで API も呼べる構成(`optional/aws-mcp.json`)は、任意で追加する。[docs/aws-mcp.md](docs/ja/aws-mcp.md)
+- **MCP**: 認証なしのドキュメント検索(`aws-docs`)を同梱している(`.mcp.json` / `mcp.json`)。IAM 認証つきで API も呼べる構成(`optional/aws-mcp.json`)は、任意で追加できる。[docs/aws-mcp.md](docs/ja/aws-mcp.md)
 - **環境の確認**: エージェントに `kensa doctor` の実行を頼む(Python・`uv`・boto3・openpyxl・`gh`・`aws` のオフラインチェックと、次の手順)。[docs/getting-started.md](docs/ja/getting-started.md)
 
 ## 出力(xlsx)
@@ -150,7 +150,7 @@ JSON 出力(`--format json`)は、項目ごとの判定・確認元・確信度�
 | [CLI リファレンス](docs/ja/cli.md) | エージェントが実行するコマンドを順に(旧クイックスタート) |
 | [設計メモ](docs/ja/design.md) | 設計の要点、汎用性(別のレンズ・CSV)、IaC だけのモード |
 | [権限(IAM)](docs/ja/aws-iam.md) | 読み取り専用ロールのテンプレートと、W-A Tool 用ロール |
-| [AWS MCP Server](docs/ja/aws-mcp.md) | 任意のドキュメント検索(認証なし)と、任意の IAM 認証つき構成 |
+| [AWS MCP Server](docs/ja/aws-mcp.md) | 同梱のドキュメント検索(認証なし)と、任意の IAM 認証つき構成 |
 | [検証状況](docs/ja/verification.md) | 確認した範囲・未確認の範囲、初回実行チェックリスト |
 | [既知の制約](docs/ja/limitations.md) | 判定の限界、未実装の機能 |
 | [比較メモ](docs/ja/comparison.md) | 既存ツールとの比較(2026-11-01 時点、非公式) |
@@ -166,7 +166,8 @@ Kensa/
 ├── commands/                    # /kensa:start・/kensa:resume・/kensa:record・/kensa:demo(Claude Code の入口)
 ├── tools/sync_manifests.py      # plugin.json から .claude-plugin/ を生成(テストで確認)
 ├── iam/scan-role.yaml           # スキャン用の読み取り専用ロール(+ 任意で W-A Tool 書き込み用ロール)の CloudFormation テンプレート
-├── optional/                    # aws-docs.json(ドキュメント検索・認証なし)/ aws-mcp.json(IAM 認証つきの AWS MCP Server)。どちらも任意
+├── .mcp.json / mcp.json         # 既定の MCP(認証なしのドキュメント検索。Claude Code 用 / Agent Plugins 用)
+├── optional/aws-mcp.json        # IAM 認証つきの AWS MCP Server の設定例(任意。既定では同梱しない)
 ├── docs/                        # 設計・IAM・検証状況・既知の制約(英語。docs/ja/ に日本語版)
 ├── skills/
 │   ├── kensa-review/            # オーケストレーション(Phase 0〜5)

@@ -1300,11 +1300,20 @@ def check_auth(a, st, regions=None, kind="scan"):
             die("Refusing to run with root user credentials. Use a read-only role (docs/aws-iam.md). "
                 "Pass --allow-root only if you really have to.", code=3)
         print("warning: these are root user credentials. Use a read-only role (docs/aws-iam.md).", file=sys.stderr)
+    # A best-effort hint only (see kensa_scan.admin_check): it warns, it never stops, and a quiet result does not prove the role is read-only
+    ident["admin_check"] = adm = kensa_scan.admin_check(session, ident["arn"])
+    if adm["findings"]:
+        print("warning: these credentials look like an administrator or can write broadly: " + "; ".join(adm["findings"]) + ". "
+              "kensa wants a read-only role (docs/aws-iam.md). Stop and confirm with the user before going on.", file=sys.stderr)
     return session, ident
 
 
 def cmd_auth_check(a, st):
     _, ident = check_auth(a, st, kind=a.target)
+    adm = ident["admin_check"]
+    if not adm["findings"]:
+        print("admin check: no AdministratorAccess, PowerUserAccess or allow-everything policy found (a best-effort hint, not proof that the role is read-only)"
+              if adm["checked"] else f"admin check: skipped ({adm['reason']})")
     if a.target == "scan" and not get_path(st.ctx(), "aws.account_ids"):
         print("hint: aws.account_ids is not set in the context. Setting it makes kensa stop when it points at another account: "
               f"`context set aws.account_ids='[\"{ident['account']}\"]'` (if this account is the right one)")
@@ -1953,7 +1962,7 @@ def build_parser():
     s = sp.add_parser("scan-repo", help="collect repository evidence (IaC, CI, documents, GitHub settings and activity)"); s.add_argument("--path", action="append"); s.add_argument("--gh", help="OWNER/REPO (needs the gh CLI)"); s.set_defaults(fn=cmd_scan_repo)
     s = sp.add_parser("scan-iac", help="statically read IaC (Terraform / CloudFormation / cdk synth output). Never touches AWS")
     s.add_argument("--path", action="append"); s.set_defaults(fn=cmd_scan_iac)
-    s = sp.add_parser("auth-check", help="check the AWS credentials and the target account (STS GetCallerIdentity only; run it before touching AWS)")
+    s = sp.add_parser("auth-check", help="check the AWS credentials and the target account (STS GetCallerIdentity, plus best-effort IAM list/get reads to warn about an administrator; run it before touching AWS)")
     s.add_argument("--profile"); s.add_argument("--allow-root", action="store_true", help="allow running with root user credentials (not recommended)"); s.add_argument("--region")
     s.add_argument("--for", dest="target", choices=["scan", "wa"], default="scan", help="scan: the profile that reads AWS (aws.profile) / wa: the profile that touches the W-A Tool (aws.wa_profile)")
     s.set_defaults(fn=cmd_auth_check)

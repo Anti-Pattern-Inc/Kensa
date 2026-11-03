@@ -77,7 +77,7 @@ Details and setup: [docs/getting-started.md](docs/getting-started.md#3-choose-ho
 - **This is an unofficial project.** It is not affiliated with, endorsed by, or sponsored by AWS. Amazon Web Services and AWS are trademarks of Amazon.com, Inc. or its affiliates. Names of AWS services and programs such as "Well-Architected" also belong to their respective owners.
 - **No text written by AWS is bundled.** Question text and best-practice text are fetched at run time from your own W-A Tool (`seed --from-wa-tool`). Everything under `tests/fixtures/` is synthetic data, including the question titles and best-practice names (`QuestionId` and `ChoiceId` are keys of the routing table, so the real identifiers are used). The routing classification in `assets/routing.json` is a design decision of this project, not an AWS classification (`QuestionId` and `ChoiceId` are used as-is, as keys of the routing table).
 - **Running it touches AWS.** Scans are read-only, but `scan-aws` calls the Cost Explorer API a few times (AWS charges 0.01 USD per request, billed per page). `push --apply` and `workload-create --apply` write to the W-A Tool.
-- **No MCP server is enabled by default.** An optional, unauthenticated documentation-search connection to a public AWS endpoint (`aws-docs`) can be added; if you do, your search terms and page URLs are sent to AWS (scan results are not). See [docs/aws-mcp.md](docs/aws-mcp.md).
+- **A documentation-search MCP (`aws-docs`) is bundled and starts when the plugin is enabled in Claude Code.** It is an unauthenticated, documentation-search-only connection to a public endpoint managed by AWS, and it uses no credentials. Your search terms and page URLs are sent to AWS over the internet (scan results are not). You can turn it off from `/mcp`. See [docs/aws-mcp.md](docs/aws-mcp.md).
 - **Start with a test account and a test workload.** Do not use a profile with administrator privileges (the agent has a shell, so the profile's credentials can also be used by other `aws` commands). A template for a read-only role is [`iam/scan-role.yaml`](iam/scan-role.yaml) ([explanation](docs/aws-iam.md)).
 - The software is provided as-is (Apache-2.0). The IAM template has not been audited by a third party.
 
@@ -114,7 +114,7 @@ Requirement: Python 3.11 or later.
 - **GitHub CLI (`gh skill`; 2.90 or later, preview)**: `gh skill install Anti-Pattern-Inc/Kensa --all --agent claude-code`. `--agent` can also be `kiro-cli`, `codex`, `cursor` and others, and `--scope user` installs for all projects. **Only the two skills under `skills/` are installed** (the scripts, assets and references live inside each skill). The `iam/` template, `optional/` and `docs/` are not installed; get them from the repository if you need them. The two skills are used one after the other (`kensa-partner-record` uses the scripts of `kensa-review`), so install them together with `--all`.
 - **Other Agent Plugins-compatible agents**: they read the same root `plugin.json` and `skills/`.
 - **Script dependencies**: `openpyxl` for the xlsx export and `boto3` for the AWS subcommands. **`uv` is recommended**: the top of `kensa.py` declares the dependencies and the Python version, so `uv run skills/kensa-review/scripts/kensa.py …` fetches them automatically on first run. Without `uv`, run `pip install openpyxl boto3` and use `python3`.
-- **MCP**: none is enabled by default. An unauthenticated documentation search (`optional/aws-docs.json`; in Claude Code `claude mcp add --transport http aws-docs https://aws-mcp.us-east-1.api.aws/mcp`) and a setup that authenticates with IAM and can also call APIs (`optional/aws-mcp.json`) can be added optionally. [docs/aws-mcp.md](docs/aws-mcp.md)
+- **MCP**: an unauthenticated documentation search (`aws-docs`) is bundled (`.mcp.json` / `mcp.json`). A setup that authenticates with IAM and can also call APIs (`optional/aws-mcp.json`) can be added optionally. [docs/aws-mcp.md](docs/aws-mcp.md)
 - **Check your setup**: ask the agent to run `kensa doctor` (an offline check of Python, `uv`, boto3, openpyxl, `gh` and `aws`, with the next step). [docs/getting-started.md](docs/getting-started.md)
 
 ## Output (xlsx)
@@ -152,7 +152,7 @@ To report a vulnerability, see [SECURITY.md](SECURITY.md).
 | [CLI reference](docs/cli.md) | The commands the agent runs, in order (what used to be the Quick start) |
 | [Design notes](docs/design.md) | Key design points, generality (another lens, CSV), the IaC-only mode |
 | [Permissions (IAM)](docs/aws-iam.md) | The read-only role template, and the role for the W-A Tool |
-| [AWS MCP Server](docs/aws-mcp.md) | The optional documentation search (unauthenticated), and the optional IAM-authenticated setup |
+| [AWS MCP Server](docs/aws-mcp.md) | The bundled documentation search (unauthenticated), and the optional IAM-authenticated setup |
 | [Verification status](docs/verification.md) | What was verified and what was not, and the first-run checklist |
 | [Known limitations](docs/limitations.md) | Limits of the verdicts, features not implemented |
 | [Comparison notes](docs/comparison.md) | Comparison with existing tools (as of 2026-11-01, unofficial) |
@@ -168,7 +168,8 @@ Kensa/
 ├── commands/                    # /kensa:start, /kensa:resume, /kensa:record, /kensa:demo (Claude Code entry points)
 ├── tools/sync_manifests.py      # derives .claude-plugin/ from plugin.json (checked by the tests)
 ├── iam/scan-role.yaml           # CloudFormation template: read-only scan role (+ optional W-A Tool write role)
-├── optional/                    # aws-docs.json (documentation search, unauthenticated) / aws-mcp.json (IAM-authenticated AWS MCP Server); both opt-in
+├── .mcp.json / mcp.json         # default MCP (unauthenticated documentation search; for Claude Code / for Agent Plugins)
+├── optional/aws-mcp.json        # example config for the IAM-authenticated AWS MCP Server (optional; not bundled by default)
 ├── docs/                        # design, IAM, verification status, known limitations (English; Japanese in docs/ja/)
 ├── skills/
 │   ├── kensa-review/            # orchestration (Phase 0-5)

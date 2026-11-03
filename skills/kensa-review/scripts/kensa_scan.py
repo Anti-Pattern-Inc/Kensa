@@ -783,6 +783,88 @@ def preflight(session, expected_accounts=None, profile=None, region=None):
     return {"account": account, "arn": arn, "principal_type": principal_type(arn)}
 
 
+# ---- administrator hint
+# kensa asks for a read-only role, but nothing in AWS stops someone from passing an administrator profile, and the code can only block writes
+# inside `scan-aws`. So `auth-check` makes a best-effort guess from the attached policies and warns. It is a hint, not a guarantee:
+# it does not look at permission boundaries, SCPs, session policies, or policies it cannot read, and a role with a harmless name can still write.
+ADMIN_POLICY_ARN = "arn:aws:iam::aws:policy/AdministratorAccess"
+BROAD_WRITE_POLICY_ARNS = {ADMIN_POLICY_ARN: "AdministratorAccess", "arn:aws:iam::aws:policy/PowerUserAccess": "PowerUserAccess"}
+_ADMIN_NAME = re.compile(r"admin", re.I)
+_POLICY_DOC_LIMIT = 10          # at most this many policy documents are fetched per principal
+
+
+def principal_ref(arn):
+    """("role" | "user", name) from a caller-identity ARN, or None for anything else (root, federated, ...)."""
+    m = re.match(r"arn:[^:]+:sts::\d+:assumed-role/([^/]+)/", arn or "")
+    if m:
+        return "role", m.group(1)
+    m = re.match(r"arn:[^:]+:iam::\d+:(role|user)/(?:.*/)?([^/]+)$", arn or "")
+    return (m.group(1), m.group(2)) if m else None
+
+
+def _as_list(v):
+    return [v] if isinstance(v, str) else list(v or [])
+
+
+def allows_everything(doc):
+    """True if the policy document has an unconditional Allow of every action on every resource."""
+    if isinstance(doc, str):
+        try:
+            doc = json.loads(urllib.parse.unquote(doc))
+        except ValueError:
+            return False
+    stmts = (doc or {}).get("Statement", [])
+    for st in [stmts] if isinstance(stmts, dict) else stmts:
+        if st.get("Effect") == "Allow" and not st.get("Condition") and "NotAction" not in st and "NotResource" not in st \
+                and "*" in _as_list(st.get("Action")) and "*" in _as_list(st.get("Resource")):
+            return True
+    return False
+
+
+def admin_check(session, arn):
+    """Best-effort look for administrator-like access. Returns {"findings": [str], "checked": bool, "reason": str}.
+
+    It only calls IAM list/get reads, through ReadOnlyClient. When IAM cannot be read (a narrow role usually cannot), it says so
+    ("checked": False) and still reports what the principal's name suggests. It never raises."""
+    ref = principal_ref(arn)
+    if ref is None:
+        return {"findings": [], "checked": False, "reason": "this kind of principal is not checked"}
+    kind, name = ref
+    findings = []
+    if _ADMIN_NAME.search(name):
+        findings.append(f"the {kind} name '{name}' suggests an administrator")
+    try:
+        iam = ReadOnlyClient(session.client("iam", region_name=GLOBAL_REGION), "iam")
+        sources = [(kind, name)]
+        if kind == "user":
+            sources += [("group", g["GroupName"]) for g in iam.list_groups_for_user(UserName=name).get("Groups", [])]
+        budget = _POLICY_DOC_LIMIT
+        for k, n in sources:
+            arg = {f"{k.capitalize()}Name": n}
+            where = f"{k} '{n}'"
+            for pol in getattr(iam, f"list_attached_{k}_policies")(**arg).get("AttachedPolicies", []):
+                label = BROAD_WRITE_POLICY_ARNS.get(pol.get("PolicyArn"))
+                if label:
+                    findings.append(f"{where} has {label} attached")
+                elif not str(pol.get("PolicyArn", "")).startswith("arn:aws:iam::aws:policy/") and budget > 0:
+                    budget -= 1                      # a customer-managed policy: read its default version
+                    v = iam.get_policy(PolicyArn=pol["PolicyArn"])["Policy"]["DefaultVersionId"]
+                    if allows_everything(iam.get_policy_version(PolicyArn=pol["PolicyArn"], VersionId=v)["PolicyVersion"]["Document"]):
+                        findings.append(f"{where} has the policy '{pol.get('PolicyName')}', which allows every action on every resource")
+            for pname in getattr(iam, f"list_{k}_policies")(**arg).get("PolicyNames", []):
+                if budget <= 0:
+                    break
+                budget -= 1                          # an inline policy
+                if allows_everything(getattr(iam, f"get_{k}_policy")(PolicyName=pname, **arg)["PolicyDocument"]):
+                    findings.append(f"{where} has the inline policy '{pname}', which allows every action on every resource")
+    except Exception as e:  # noqa: BLE001
+        code = getattr(e, "response", {}).get("Error", {}).get("Code", "") or type(e).__name__
+        reason = "IAM could not be read with these credentials, so the attached policies were not checked" if re.search(r"AccessDenied|Unauthorized", code) \
+            else f"the attached policies could not be checked ({code})"
+        return {"findings": findings, "checked": False, "reason": reason}
+    return {"findings": findings, "checked": True, "reason": ""}
+
+
 def classify_error(e):
     code = getattr(e, "response", {}).get("Error", {}).get("Code", "") or type(e).__name__
     msg = str(getattr(e, "response", {}).get("Error", {}).get("Message", "") or e)[:160]

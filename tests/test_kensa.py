@@ -12,6 +12,7 @@ import string
 import sys
 import tempfile
 import unittest
+import urllib.parse
 from unittest import mock
 
 try:
@@ -1382,6 +1383,187 @@ class AuthPreflight(Seeded):
             self.assertIn("no credentials were found", err)
 
 
+class AdminHint(Seeded):
+    """`auth-check` / `scan-aws` warn when the credentials look like an administrator. It is a best-effort hint: it warns, never stops."""
+
+    ACCT = "123456789012"
+
+    def setUp(self):
+        super().setUp()
+        p = mock.patch.object(kensa_wa, "client", side_effect=AssertionError("the test tried to create a real AWS client"))
+        p.start()
+        self.addCleanup(p.stop)
+
+    def sess(self, table):
+        return mock.patch.object(kensa_scan, "make_session", lambda profile=None, region=None: FakeSession(table))
+
+    def role(self, name="ReadOnly"):
+        return {STS: {"Account": self.ACCT, "Arn": f"arn:aws:sts::{self.ACCT}:assumed-role/{name}/me"}}
+
+    @staticmethod
+    def attached(*arns):
+        return {("iam", "list_attached_role_policies"): {"AttachedPolicies": [{"PolicyName": a.rsplit("/", 1)[-1], "PolicyArn": a} for a in arns]},
+                ("iam", "list_role_policies"): {"PolicyNames": []}}
+
+    def test_principal_ref_reads_roles_and_users_only(self):
+        ref = kensa_scan.principal_ref
+        self.assertEqual(ref("arn:aws:sts::123456789012:assumed-role/Ro/me"), ("role", "Ro"))
+        self.assertEqual(ref("arn:aws:iam::123456789012:role/some/path/Ro"), ("role", "Ro"))
+        self.assertEqual(ref("arn:aws:iam::123456789012:user/team/alice"), ("user", "alice"))
+        self.assertEqual(ref("arn:aws-cn:sts::123456789012:assumed-role/Ro/me"), ("role", "Ro"))
+        for other in ("arn:aws:iam::123456789012:root", "arn:aws:sts::123456789012:federated-user/bob", "", None):
+            self.assertIsNone(ref(other), other)
+
+    def test_allows_everything_needs_an_unconditional_allow_of_star_on_star(self):
+        f = kensa_scan.allows_everything
+        star = {"Effect": "Allow", "Action": "*", "Resource": "*"}
+        self.assertTrue(f({"Statement": star}))                                             # a single statement, not a list
+        self.assertTrue(f({"Statement": [{"Effect": "Allow", "Action": ["*"], "Resource": ["*"]}]}))
+        self.assertTrue(f(urllib.parse.quote(json.dumps({"Statement": [star]}))))           # a URL-encoded string document
+        self.assertFalse(f({"Statement": [{**star, "Condition": {"Bool": {"aws:SecureTransport": "true"}}}]}))
+        self.assertFalse(f({"Statement": [{**star, "Effect": "Deny"}]}))
+        self.assertFalse(f({"Statement": [{"Effect": "Allow", "NotAction": "iam:*", "Resource": "*"}]}))
+        self.assertFalse(f({"Statement": [{"Effect": "Allow", "Action": "s3:*", "Resource": "*"}]}))
+        self.assertFalse(f({"Statement": [{"Effect": "Allow", "Action": "*", "Resource": "arn:aws:s3:::b/*"}]}))
+        self.assertFalse(f("not json"))
+        self.assertFalse(f(None))
+
+    def test_a_read_only_role_gets_a_clean_but_modest_report(self):
+        table = {**self.role(), **self.attached("arn:aws:iam::aws:policy/ReadOnlyAccess", "arn:aws:iam::aws:policy/SecurityAudit")}
+        with self.sess(table):
+            code, out, err = run(["auth-check"], self.d)
+        self.assertEqual(code, 0, err)
+        self.assertIn("admin check: no AdministratorAccess", out)
+        self.assertIn("not proof", out)                      # it does not claim the role is read-only
+        self.assertNotIn("warning", err)
+
+    def test_an_attached_administrator_policy_warns_but_does_not_stop(self):
+        table = {**self.role("Ops"), **self.attached("arn:aws:iam::aws:policy/AdministratorAccess")}
+        with self.sess(table):
+            code, out, err = run(["auth-check"], self.d)
+        self.assertEqual(code, 0)                            # a hint, not a block
+        self.assertIn("warning: these credentials look like an administrator", err)
+        self.assertIn("AdministratorAccess attached", err)
+        self.assertIn("Stop and confirm with the user", err)
+        self.assertNotIn("admin check: no", out)             # it must not also say it found nothing
+        # the scan warns the same way and still runs
+        with self.sess(table):
+            code, out, err = run(["scan-aws", "--regions", "ap-northeast-1"], self.d)
+        self.assertEqual(code, 0, err)
+        self.assertIn("AdministratorAccess attached", err)
+        self.assertIn("AWS scan done", out)
+
+    def test_power_user_access_is_flagged_as_broad_write(self):
+        table = {**self.role("Dev"), **self.attached("arn:aws:iam::aws:policy/PowerUserAccess")}
+        with self.sess(table):
+            _, _, err = run(["auth-check"], self.d)
+        self.assertIn("PowerUserAccess attached", err)
+
+    def test_the_sso_administrator_role_name_is_a_hint_even_when_iam_cannot_be_read(self):
+        table = {**self.role("AWSReservedSSO_AdministratorAccess_0123abcd"),
+                 ("iam", "list_attached_role_policies"): Fake("AccessDenied", "not allowed")}
+        with self.sess(table):
+            code, _, err = run(["auth-check"], self.d)
+        self.assertEqual(code, 0)
+        self.assertIn("suggests an administrator", err)
+
+    def test_when_iam_cannot_be_read_it_says_the_check_was_skipped(self):
+        table = {**self.role("Scan"), ("iam", "list_attached_role_policies"): Fake("AccessDenied", "not allowed")}
+        with self.sess(table):
+            code, out, err = run(["auth-check"], self.d)
+        self.assertEqual(code, 0)
+        self.assertIn("admin check: skipped (IAM could not be read", out)
+        self.assertNotIn("warning", err)
+        self.assertNotIn("admin check: no", out)
+
+    def test_another_failure_is_reported_as_skipped_not_raised(self):
+        table = {**self.role("Scan"), ("iam", "list_attached_role_policies"): Fake("Throttling", "slow down")}
+        with self.sess(table):
+            code, out, _ = run(["auth-check"], self.d)
+        self.assertEqual(code, 0)
+        self.assertIn("skipped (the attached policies could not be checked (Throttling))", out)
+
+    def test_a_customer_managed_policy_that_allows_everything_is_found(self):
+        arn = f"arn:aws:iam::{self.ACCT}:policy/Everything"
+        doc = {"Version": "2012-10-17", "Statement": [{"Effect": "Allow", "Action": "*", "Resource": "*"}]}
+        table = {**self.role("Ops"), **self.attached(arn),
+                 ("iam", "get_policy"): {"Policy": {"DefaultVersionId": "v2"}},
+                 ("iam", "get_policy_version"): {"PolicyVersion": {"Document": doc}}}
+        with self.sess(table):
+            _, _, err = run(["auth-check"], self.d)
+        self.assertIn("'Everything', which allows every action on every resource", err)
+        doc["Statement"][0]["Condition"] = {"StringEquals": {"aws:RequestedRegion": "ap-northeast-1"}}   # a condition: not an unconditional admin
+        with self.sess(table):
+            _, out, err = run(["auth-check"], self.d)
+        self.assertNotIn("warning", err)
+
+    def test_an_inline_policy_that_allows_everything_is_found(self):
+        doc = {"Statement": [{"Effect": "Allow", "Action": "*", "Resource": "*"}]}
+        table = {**self.role("Ops"), **self.attached(),
+                 ("iam", "list_role_policies"): {"PolicyNames": ["inline-all"]},
+                 ("iam", "get_role_policy"): {"PolicyDocument": doc}}
+        with self.sess(table):
+            _, _, err = run(["auth-check"], self.d)
+        self.assertIn("inline policy 'inline-all'", err)
+
+    def test_a_user_gets_its_groups_checked_too(self):
+        table = {STS: {"Account": self.ACCT, "Arn": f"arn:aws:iam::{self.ACCT}:user/alice"},
+                 ("iam", "list_groups_for_user"): {"Groups": [{"GroupName": "admins"}]},
+                 ("iam", "list_attached_user_policies"): {"AttachedPolicies": []},
+                 ("iam", "list_user_policies"): {"PolicyNames": []},
+                 ("iam", "list_attached_group_policies"): {"AttachedPolicies": [{"PolicyName": "AdministratorAccess", "PolicyArn": kensa_scan.ADMIN_POLICY_ARN}]},
+                 ("iam", "list_group_policies"): {"PolicyNames": []}}
+        with self.sess(table):
+            code, _, err = run(["auth-check"], self.d)
+        self.assertEqual(code, 0)
+        self.assertIn("group 'admins' has AdministratorAccess attached", err)
+
+    def test_the_check_only_calls_iam_reads(self):
+        calls = []
+
+        def rec(op, value):
+            return lambda **kw: calls.append(op) or value
+        arn = f"arn:aws:iam::{self.ACCT}:policy/Mine"
+        table = {**self.role("Ops"),
+                 ("iam", "list_attached_role_policies"): rec("list_attached_role_policies", {"AttachedPolicies": [{"PolicyName": "Mine", "PolicyArn": arn}]}),
+                 ("iam", "list_role_policies"): rec("list_role_policies", {"PolicyNames": ["p"]}),
+                 ("iam", "get_policy"): rec("get_policy", {"Policy": {"DefaultVersionId": "v1"}}),
+                 ("iam", "get_policy_version"): rec("get_policy_version", {"PolicyVersion": {"Document": {"Statement": []}}}),
+                 ("iam", "get_role_policy"): rec("get_role_policy", {"PolicyDocument": {"Statement": []}})}
+        with self.sess(table):
+            code, _, _ = run(["auth-check"], self.d)
+        self.assertEqual(code, 0)
+        self.assertTrue(calls)
+        self.assertTrue(all(c.startswith(("list_", "get_")) for c in calls), calls)
+        self.assertTrue(all(kensa_scan.ReadOnlyClient.allowed(c) for c in calls), calls)
+
+    def test_the_number_of_policy_documents_read_is_capped(self):
+        many = [f"arn:aws:iam::{self.ACCT}:policy/P{i}" for i in range(40)]
+        n = []
+        table = {**self.role("Ops"), **self.attached(*many),
+                 ("iam", "get_policy"): lambda **kw: n.append(1) or {"Policy": {"DefaultVersionId": "v1"}},
+                 ("iam", "get_policy_version"): {"PolicyVersion": {"Document": {"Statement": []}}}}
+        with self.sess(table):
+            code, _, _ = run(["auth-check"], self.d)
+        self.assertEqual(code, 0)
+        self.assertEqual(len(n), kensa_scan._POLICY_DOC_LIMIT)
+
+    def test_root_credentials_allowed_explicitly_are_not_checked_for_admin(self):
+        root = {STS: {"Account": self.ACCT, "Arn": f"arn:aws:iam::{self.ACCT}:root"}}
+        with self.sess(root):
+            code, out, _ = run(["auth-check", "--allow-root"], self.d)
+        self.assertEqual(code, 0)
+        self.assertIn("admin check: skipped (this kind of principal is not checked)", out)
+
+    def test_docs_and_skill_tell_the_agent_what_to_do_with_the_warning(self):
+        skill = read_text(os.path.join(ROOT, "skills", "kensa-review", "SKILL.md"))
+        self.assertIn("look like an administrator", skill)
+        self.assertIn("stop and tell the user", skill)
+        self.assertIn("not proof of read-only", skill)
+        for rel, phrase in (("docs/aws-iam.md", "admin check"), ("docs/ja/aws-iam.md", "管理者チェック")):
+            self.assertIn(phrase, read_text(os.path.join(ROOT, rel)), rel)
+
+
 class ProfileSplit(Seeded):
     """Separate the profile that reads AWS (aws.profile) from the one that touches the W-A Tool (aws.wa_profile)."""
 
@@ -1568,7 +1750,7 @@ class Packaging(unittest.TestCase):
         mk = read_json(os.path.join(ROOT, ".claude-plugin", "marketplace.json"))
         versions = {cc["version"], ap["version"], mk["metadata"]["version"], mk["plugins"][0]["version"]}
         self.assertEqual(len(versions), 1, versions)
-        self.assertNotIn("mcpServers", cc)   # no MCP is bundled; see test_no_mcp_server_is_enabled_by_default
+        self.assertNotIn("mcpServers", cc)   # Claude Code finds the bundled .mcp.json by itself (a key here would replace it); see test_bundled_mcp_is_docs_only_and_credential_free
         self.assertTrue(os.path.isdir(os.path.join(ROOT, cc["skills"])))
         self.assertEqual(cc["keywords"], ap["keywords"])
         self.assertEqual({cc["license"], ap["license"]}, {"Apache-2.0"})
@@ -1579,24 +1761,37 @@ class Packaging(unittest.TestCase):
         opt = read_json(os.path.join(ROOT, "optional", "aws-mcp.json"))
         self.assertIn("aws-mcp", opt["mcpServers"])
 
-    def test_no_mcp_server_is_enabled_by_default(self):
-        # A plugin's MCP servers start automatically on install. The review needs none, so nothing is bundled: both are opt-in files under optional/
-        for rel in (".mcp.json", "mcp.json"):
-            self.assertFalse(os.path.exists(os.path.join(ROOT, rel)), rel)
-        self.assertNotIn("mcpServers", read_json(os.path.join(ROOT, ".claude-plugin", "plugin.json")))
-        self.assertNotIn("mcpServers", read_json(os.path.join(ROOT, "plugin.json")))
-
-    def test_optional_docs_mcp_is_credential_free_and_does_not_clash_with_the_iam_one(self):
-        docs = read_json(os.path.join(ROOT, "optional", "aws-docs.json"))
-        self.assertEqual(docs["$schema"], "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json")
-        self.assertEqual(set(docs), {"$schema", "mcpServers"})
-        self.assertEqual(set(docs["mcpServers"]), {"aws-docs"})
-        d = docs["mcpServers"]["aws-docs"]
-        self.assertEqual(d, {"type": "streamable-http", "url": d["url"]})   # a remote connection only: no credentials, profile or process launch
-        self.assertTrue(d["url"].startswith("https://aws-mcp.") and d["url"].endswith("/mcp"), d["url"])
+    def test_bundled_mcp_is_docs_only_and_credential_free(self):
+        # The MCP installed by default is only a credential-free remote connection. It has no credentials, profile or process launch
+        cc = read_json(os.path.join(ROOT, ".mcp.json"))
+        ap = read_json(os.path.join(ROOT, "mcp.json"))
+        self.assertEqual(ap["$schema"], "https://agent-plugins.org/schemas/1.0.0/mcp.schema.json")
+        self.assertEqual(set(cc), {"mcpServers"})
+        self.assertEqual(set(ap), {"$schema", "mcpServers"})
+        self.assertEqual(set(cc["mcpServers"]), {"aws-docs"})
+        self.assertEqual(set(ap["mcpServers"]), {"aws-docs"})
+        c, a = cc["mcpServers"]["aws-docs"], ap["mcpServers"]["aws-docs"]
+        self.assertEqual(c, {"type": "http", "url": c["url"]})   # the Claude Code type
+        self.assertEqual(a, {"type": "streamable-http", "url": a["url"]})   # the type in the Agent Plugins schema
+        self.assertEqual(c["url"], a["url"])
+        self.assertTrue(c["url"].startswith("https://aws-mcp.") and c["url"].endswith("/mcp"), c["url"])
+        # Server names do not overlap with the optional IAM-authenticated configuration, and nothing else is bundled under optional/ that would clash
         self.assertNotIn("aws-docs", read_json(os.path.join(ROOT, "optional", "aws-mcp.json"))["mcpServers"])
-        text = read_text(os.path.join(ROOT, "docs", "aws-mcp.md"))
-        self.assertIn("claude mcp add --transport http aws-docs " + d["url"], text)   # the documented Claude Code opt-in matches the file
+        self.assertFalse(os.path.exists(os.path.join(ROOT, "optional", "aws-docs.json")))   # it is bundled, so no opt-in copy is kept
+
+    def test_docs_say_the_docs_mcp_is_bundled_and_the_iam_one_is_optional(self):
+        # The wording that was "opt-in" until 2026-11-03 must not survive in the docs
+        for rel in ("README.md", "README.ja.md", "docs/aws-mcp.md", "docs/ja/aws-mcp.md", "docs/limitations.md", "docs/ja/limitations.md",
+                    "skills/kensa-review/SKILL.md", "skills/kensa-review/references/phase-0-1-context-lens.md"):
+            text = read_text(os.path.join(ROOT, rel))
+            self.assertNotIn("optional/aws-docs.json", text, rel)
+            self.assertNotIn("claude mcp add --transport http aws-docs", text, rel)
+            self.assertNotIn("No MCP server is enabled by default", text, rel)
+            self.assertNotIn("既定で有効になる MCP サーバーはありません", text, rel)
+        # SKILL.md keeps the agent from following the server's own "prefer MCP over Bash" instruction
+        skill = read_text(os.path.join(ROOT, "skills", "kensa-review", "SKILL.md"))
+        self.assertIn("ignore that here", skill)
+        self.assertIn("scan-aws", skill)
 
     def test_skills_follow_the_agent_skills_layout(self):
         # What readers of Agent Skills (Kiro Power, `gh skill install`, ...) expect: skills/<name>/SKILL.md, name equal to the directory name,
