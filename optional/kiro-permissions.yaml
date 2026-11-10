@@ -1,0 +1,43 @@
+# kensa: pre-approved shell commands for Kiro (fewer approval prompts during a review).
+#
+# Copy the rule below into ~/.kiro/settings/permissions.yaml (all workspaces; merge it into an existing `rules:` list).
+# Kiro does not read a permissions file from the repository, so this file does nothing where it is.
+# Format: https://kiro.dev/docs/permissions/ (capability / match / exclude / effect). Written from that documentation;
+# not exercised in a live Kiro session yet.
+#
+# Only the LOCAL subcommands are allowed: they read or write `.kensa/` and the repository you point them at.
+# Left out on purpose, so that Kiro keeps asking: auth-check, scan-aws, seed --from-wa-tool, push, precheck, workload-create
+# (they touch AWS), export (writes wherever --out says) and scan-repo (calls gh with --gh).
+#
+# Do NOT "Always allow" `uv run *` (or `python3 *`) from the approval prompt: it lets any script run,
+# including the kensa subcommands that touch AWS, and an `allow` anywhere is enough for Kiro to stop asking.
+#
+# These patterns match only when the agent writes the command on one line, starting with `uv run`, with the
+# subcommand right after kensa.py (the kensa skills tell it to). A global option before the subcommand
+# (`kensa.py --dir X plan`) does not match and just prompts. Without uv, copy the rules with `python3 *kensa.py …`.
+rules:
+  - capability: shell
+    effect: allow
+    match:
+      - "uv run *kensa.py doctor*"
+      - "uv run *kensa.py plan*"
+      - "uv run *kensa.py status*"
+      - "uv run *kensa.py coverage*"
+      - "uv run *kensa.py items*"
+      - "uv run *kensa.py diff*"
+      - "uv run *kensa.py business *"
+      - "uv run *kensa.py cards *"
+      - "uv run *kensa.py context *"
+      - "uv run *kensa.py apply *"
+      - "uv run *kensa.py finalize*"
+      - "uv run *kensa.py snapshot*"
+      - "uv run *kensa.py scan-iac*"
+      - "uv run *kensa.py seed --from-csv *"
+      - "uv run *kensa.py iam-policy *"
+    exclude:
+      - "*kensa.py * --apply*"
+      - "*kensa.py *scan-aws*"
+      - "*kensa.py *push*"
+      - "*kensa.py *precheck*"
+      - "*kensa.py *workload-create*"
+      - "*kensa.py *--from-wa-tool*"

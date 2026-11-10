@@ -20,7 +20,7 @@ The checks that `W scan-aws` runs, and **guidelines** for deciding ○/△/✗ f
 | `iam_users` | global | users_total, users_with_active_keys, active_keys_older_than_90d, console_users_without_mfa | iam |
 | `federation` | global | oidc_providers, github_actions_oidc, saml_providers, identity_center_instances | iam, iac-aws |
 | `access_analyzer` | regional | analyzers(type/status) | threat-detect, iam |
-| `cloudtrail` | regional | trails(multi_region, log_validation, kms, org_trail, is_logging) | cloudtrail |
+| `cloudtrail` | regional | trails(multi_region, log_validation, kms, org_trail, is_logging, home_region, shadow) — includes multi-Region and organization trails whose home is another Region or the management account (`shadow`); `is_logging` can be null for an organization trail read from a member account | cloudtrail |
 | `config` | regional | recorders, recording, all_supported, rules, conformance_packs | config |
 | `guardduty` | regional | enabled, features_enabled | threat-detect |
 | `securityhub` | regional | subscribed, standards | threat-detect |
@@ -66,7 +66,7 @@ A row marked `—` is "not grounds for anything". When unsure, go one level lowe
 - Break-glass (`sec_permissions_emergency_process`): cannot be judged from AWS. Ask in the interview (C-SEC-FORENSIC).
 
 ### cloudtrail / config / threat-detect (`sec_detect_investigate_events_*`, `sec_incident_response_*`, `sec_securely_operate_*`)
-- Log collection (`app_service_logging`/`logs`): ○ = a multi-region CloudTrail is on with log validation + VPC Flow Logs exist + ALB access logs are on. If some are missing → △. No CloudTrail → ✗.
+- Log collection (`app_service_logging`/`logs`): ○ = a multi-region CloudTrail is on with log validation + VPC Flow Logs exist + ALB access logs are on. If some are missing → △. No CloudTrail → ✗. A trail with `shadow: true` (a multi-Region trail homed in another Region, or an organization trail) counts: it logs this Region too. If `is_logging` is null for an organization trail, confirm with the management account instead of judging ✗.
 - Fixing non-compliant resources (`noncompliant_resources`): ○ = Config records all resources + rules/conformance packs + automatic remediation. Recording only → △. No Config → ✗.
 - Correlating security events (`security_alerts`): ○ = GuardDuty is on + Security Hub is subscribed + notifications (EventBridge → SNS/chat). GuardDuty only → △.
 - Keeping up with threats (`updated_threats`) and automated protection (`auto_protection`): Inspector is on for EC2/ECR/Lambda → ○, on for some → △, off → ✗.

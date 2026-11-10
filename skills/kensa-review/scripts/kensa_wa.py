@@ -140,22 +140,48 @@ def plan_updates(items, none_choices=None, exclude_assumed=False, lang="en"):
     return sorted(plans, key=lambda p: p["QuestionId"])
 
 
-def _retry(fn, tries=4):
+# ConflictException: the W-A Tool briefly refuses a write while it is still processing the previous one
+# (seen right after UpdateAnswer, when CreateMilestone followed at once). It clears on its own, so wait and retry.
+RETRY_CODES = ("ThrottlingException", "TooManyRequestsException", "ConflictException")
+
+
+def _retry(fn, tries=5):
     for n in range(tries):
         try:
             return fn()
         except Exception as e:  # noqa: BLE001
             code = getattr(e, "response", {}).get("Error", {}).get("Code", "")
-            if code in ("ThrottlingException", "TooManyRequestsException") and n < tries - 1:
+            if code in RETRY_CODES and n < tries - 1:
                 time.sleep(2 ** n)
                 continue
             raise
 
 
+def existing_answers(c, workload_id, lens="wellarchitected"):
+    """How many questions of the workload already have an answer in the W-A Tool (a selected choice, or marked not applicable).
+    `push --apply` overwrites them, so a non-zero count means a rollback milestone is taken first."""
+    n, token = 0, None
+    while True:
+        kw = dict(WorkloadId=workload_id, LensAlias=lens, MaxResults=50)
+        if token:
+            kw["NextToken"] = token
+        resp = _retry(lambda: c.list_answers(**kw))
+        n += sum(1 for a in resp.get("AnswerSummaries", []) if a.get("SelectedChoices") or a.get("IsApplicable") is False)
+        token = resp.get("NextToken")
+        if not token:
+            return n
+
+
+def backup_milestone_name(now=None):
+    return "kensa-before-push-" + (now or _now()).strftime("%Y%m%dT%H%M%SZ")
+
+
 def push(workload_id, items, lens="wellarchitected", apply=False, none_choices=None, c=None, region=None, profile=None,
-         exclude_assumed=False, milestone=None, lang="en"):
+         exclude_assumed=False, milestone=None, lang="en", backup=True):
     """Dry-run by default. With apply=True calls UpdateAnswer per question. Returns a result list.
 
+    backup: with apply=True, first count the answers the workload already has (ListAnswers); if there are any, create a milestone
+    (`kensa-before-push-<UTC time>`) before overwriting them, so that they can be restored. If that milestone cannot be created, nothing is written.
     milestone: with apply=True, call CreateMilestone only when every question was updated successfully (not if even one failed).
     """
     plans = plan_updates(items, none_choices, exclude_assumed, lang)
@@ -163,6 +189,17 @@ def push(workload_id, items, lens="wellarchitected", apply=False, none_choices=N
     if not apply:
         return [{"question_id": p["QuestionId"], "status": "dry-run", **p["_summary"]} for p in plans]
     c = c or client(region, profile)
+    if backup:
+        try:
+            n = existing_answers(c, workload_id, lens)
+            if n:
+                name = backup_milestone_name()
+                m = _retry(lambda: c.create_milestone(WorkloadId=workload_id, MilestoneName=name))
+                results.append({"question_id": "(backup milestone)", "status": "backup-milestone", "milestone": name,
+                                "number": m.get("MilestoneNumber"), "existing": n})
+        except Exception as e:  # noqa: BLE001
+            return [{"question_id": "(backup milestone)", "status": "backup-milestone-error",
+                     "error": f"nothing was written: could not save the existing answers as a milestone first ({str(e)[:240]})"}]
     for p in plans:
         kw = {k: v for k, v in p.items() if not k.startswith("_") and k != "QuestionId"}
         try:

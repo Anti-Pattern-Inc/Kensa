@@ -4,7 +4,7 @@
 
 ## Phase 3: Interview with decision cards (organization, process, business decisions)
 
-`W cards next -n 3` prints the **cards** for the items that evidence did not settle. One card handles several best practices together (30 cards cover the 155 items that may need an interview). **For items that have detected evidence (a draft), it appears at the top of the card as "detected evidence".** Use it to confirm ("it looks like ○, is that right?") rather than asking from zero.
+`W cards next -n 3` prints the **cards** for the items that evidence did not settle. One card handles several best practices together (30 cards cover the 155 items that may need an interview). **For items that have detected evidence (a draft), it appears at the top of the card as "detected evidence".** Use it to confirm ("it looks like ○, is that right?") rather than asking from zero. In a time-boxed session, `W cards next -n 3 --pillar security,reliability,operationalExcellence` (any comma-separated pillar ids or names) shows only the cards that cover those pillars; tell the user which pillars are left for later.
 
 1. Show the card to the user as it is (or tidied up a little). Format: **question → four options for the current state (○ Done / △ Partial / ✗ Not done / N/A) → ★ recommendation and steps → alternatives (when to choose each, and the trade-offs)**. The recommendations suit a small team of about four people, and `{po}`, `{chat}`, `{vcs}` and so on are filled from the `context` values.
    - Cards that start from technical terms (RTO/RPO, SLO, forensics, ORR, game days) carry a **question in business language (`ask_plain`)**. When you also ask PO or sales people, ask with that one first, and add the technical terms only when needed.

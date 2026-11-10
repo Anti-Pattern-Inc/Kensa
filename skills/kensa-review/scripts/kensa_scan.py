@@ -1014,16 +1014,19 @@ def _aa(S, r):
 @check("cloudtrail", "cloudtrail", "regional")
 def _ct(S, r):
     ct = S.c("cloudtrail", r)
-    trails = ct.describe_trails(includeShadowTrails=False).get("trailList", [])
+    # Shadow trails are included: a multi-Region trail whose home is another Region, and an organization trail created in the
+    # management account, both log this Region but are listed here only as shadow trails. Leaving them out reported "no trail".
+    trails = list({t["TrailARN"]: t for t in ct.describe_trails(includeShadowTrails=True).get("trailList", []) if t.get("TrailARN")}.values())
     out = []
     for t in trails[:20]:
         logging_on = None
-        try:
+        try:   # by ARN, which also works for a shadow trail; a member account may not be allowed to read an organization trail's status
             logging_on = ct.get_trail_status(Name=t["TrailARN"]).get("IsLogging")
         except Exception:  # noqa: BLE001
             pass
         out.append({"multi_region": t.get("IsMultiRegionTrail"), "log_validation": t.get("LogFileValidationEnabled"),
-                    "kms": bool(t.get("KmsKeyId")), "org_trail": t.get("IsOrganizationTrail"), "is_logging": logging_on})
+                    "kms": bool(t.get("KmsKeyId")), "org_trail": t.get("IsOrganizationTrail"), "is_logging": logging_on,
+                    "home_region": t.get("HomeRegion"), "shadow": bool(t.get("HomeRegion")) and t.get("HomeRegion") != r})
     return {"trails": out}
 
 

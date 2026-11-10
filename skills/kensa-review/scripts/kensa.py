@@ -772,6 +772,20 @@ def card_is_answered(answered, cid, pending_ids):
     return True if known is None else not (set(pending_ids) - set(known))
 
 
+def pillar_filter(spec):
+    """`--pillar security,reliability` (or the pillar names as the lens gives them) -> a predicate on an item's pillar; None when no filter was given."""
+    if not spec:
+        return None
+    want = {x.strip().lower() for x in spec.split(",") if x.strip()}
+    return lambda p: (p or "").lower() in want or (PILLAR_ID.get(p) or "").lower() in want
+
+
+def cards_in_pillars(w, card_ids, keep):
+    """The card ids that cover at least one active item in a kept pillar."""
+    hit = {it["route"].get("card") for it in active(w) if keep(it["pillar"])} if w else set()
+    return {c for c in card_ids if c in hit}
+
+
 def cmd_cards(a, st):
     cards = load_cards(st)
     ctx = st.ctx()
@@ -780,7 +794,11 @@ def cmd_cards(a, st):
         w = load_json(st.p_work)
         pend = {c["id"]: ids for c, ids in pending_cards(w, cards)} if w else {}
         answered = st.cards_state()
+        keep = pillar_filter(a.pillar)
+        shown = cards_in_pillars(w, [c["id"] for c in cards["cards"]], keep) if keep else None
         for c in cards["cards"]:
+            if shown is not None and c["id"] not in shown:
+                continue
             mark = "answered" if card_is_answered(answered, c["id"], pend.get(c["id"], [])) else ("pending" if c["id"] in pend else "-")
             if a.pending and mark != "pending":
                 continue
@@ -795,6 +813,14 @@ def cmd_cards(a, st):
         pend = pending_cards(w, cards)
         answered = st.cards_state()
         pend = [(c, ids) for c, ids in pend if not card_is_answered(answered, c["id"], ids)]
+        keep = pillar_filter(a.pillar)
+        if keep:
+            left = len(pend)
+            shown = cards_in_pillars(w, [c["id"] for c, _ in pend], keep)
+            pend = [(c, ids) for c, ids in pend if c["id"] in shown]
+            if not pend and left:
+                print(f"No ready card covers pillar(s) {a.pillar}; {left} card(s) for other pillars are waiting (drop --pillar to see them).")
+                return
         if not pend:
             waiting = collections.OrderedDict()      # card id -> scans it waits for
             for it in active(w):
@@ -1815,16 +1841,26 @@ def cmd_push(a, st):
               "Verify them in the live environment before FTR or any external submission (`mode both` → `scan-aws`)")
     if a.milestone and not a.apply:
         print(f"(milestone {a.milestone!r} is created only with --apply, and only when there are no errors)")
+    if not a.apply:
+        print("(with --apply, any answers the workload already has are first saved as a milestone `kensa-before-push-<UTC time>`, "
+              "so that they can be restored; --no-backup-milestone skips this)" if not a.no_backup_milestone else
+              "warning: --no-backup-milestone: with --apply, existing answers in the workload are overwritten without a rollback milestone")
     if a.apply:   # a dry run touches no AWS, so it needs no credentials either
         check_auth(a, st, kind="wa")
     res = kensa_wa.push(wid, items, a.lens or get_path(ctx, "aws.lens") or "wellarchitected", apply=a.apply,
                        none_choices=w["meta"].get("none_choices"), region=a.region, profile=aws_profile(a, ctx, "wa"),
-                       exclude_assumed=a.exclude_assumed, milestone=a.milestone if a.apply else None, lang=st.lang)
+                       exclude_assumed=a.exclude_assumed, milestone=a.milestone if a.apply else None, lang=st.lang,
+                       backup=not a.no_backup_milestone)
     c = collections.Counter(r["status"] for r in res)
     print(("APPLIED" if a.apply else "DRY-RUN (nothing was written; use --apply to run)"), dict(c))
     for r in res:
-        if r["status"] in ("error", "milestone-error", "milestone-skipped"):
+        if r["status"] == "backup-milestone":
+            print(f"  saved the {r['existing']} existing answer(s) as milestone {r['milestone']!r} (number {r['number']}) before overwriting them")
+        if r["status"] in ("error", "milestone-error", "milestone-skipped", "backup-milestone-error"):
             print(f"  {r['status']}:", r["question_id"], r["error"])
+    if any(r["status"] == "backup-milestone-error" for r in res):
+        die("push stopped before writing anything. Check that the role has wellarchitected:ListAnswers and CreateMilestone, "
+            "or pass --no-backup-milestone to overwrite the existing answers without a rollback point", 1)
     if not a.apply:
         for r in res[:8]:
             print(f"  {r['question_id']}: selected={r['selected']}/{r['total']} (N/A={r['na']})")
@@ -2037,9 +2073,10 @@ def build_parser():
     s = sp.add_parser("apply", help="record verdicts (and management fields) from a JSON file"); s.add_argument("file"); s.add_argument("--force", action="store_true"); s.set_defaults(fn=cmd_apply)
 
     s = sp.add_parser("cards", help="decision cards"); cs = s.add_subparsers(dest="cards_cmd", required=True)
-    x = cs.add_parser("list", help="list all cards with their state (answered / pending / -)"); x.add_argument("--pending", action="store_true", help="only the cards that wait for an answer")
+    x = cs.add_parser("list", help="list all cards with their state (answered / pending / -)"); x.add_argument("--pending", action="store_true", help="only the cards that wait for an answer"); x.add_argument("--pillar", help="only cards that cover these pillars (comma-separated, e.g. security,reliability,operationalExcellence)")
     x = cs.add_parser("show", help="print one card (question, detected evidence, options, recommendation)"); x.add_argument("id"); x.add_argument("--json", action="store_true")
     x = cs.add_parser("next", help="print the next cards to ask (only those whose evidence scans are done)"); x.add_argument("-n", type=int, default=3, help="how many cards (default 3)"); x.add_argument("--json", action="store_true")
+    x.add_argument("--pillar", help="only cards that cover these pillars (comma-separated, e.g. security,reliability,operationalExcellence); for a time-boxed session")
     cs.add_parser("prefill", help="draft the recommendations as proposals (verdicts are not changed)")
     x = cs.add_parser("answer", help="record the current state of a card (and which option to adopt)"); x.add_argument("id"); x.add_argument("--current", required=True, choices=["full", "partial", "none", "na"], help="full=○ / partial=△ / none=✗ / na=N/A")
     x.add_argument("--choose", help="recommend | alt1 | alt2 | current"); x.add_argument("--note"); x.add_argument("--evidence")
@@ -2063,6 +2100,7 @@ def build_parser():
     s.add_argument("--workload-id"); s.add_argument("--lens"); s.add_argument("--apply", action="store_true")
     s.add_argument("--exclude-assumed", action="store_true", help="do not send assumed ✗ items (no evidence, no answer)")
     s.add_argument("--milestone", help="with --apply, create a W-A Tool milestone with this name, only when every question was recorded successfully")
+    s.add_argument("--no-backup-milestone", action="store_true", help="with --apply, do not save the workload's existing answers as a milestone before overwriting them")
     s.add_argument("--allow-unresolved", action="store_true"); s.add_argument("--region"); s.add_argument("--profile"); s.add_argument("--allow-root", action="store_true", help="allow running with root user credentials (not recommended)"); s.set_defaults(fn=cmd_push)
     s = sp.add_parser("iam-policy", help="print an IAM policy JSON (scan-deny: extra Deny for value-returning reads / wa-tool-read|write: Allow for the W-A Tool)")
     s.add_argument("--kind", choices=["scan-deny", "wa-tool-read", "wa-tool-write"], default="scan-deny"); s.set_defaults(fn=cmd_iam_policy)

@@ -14,7 +14,7 @@ https://github.com/Anti-Pattern-Inc/Kensa をつかって W-A 診断をしてく
 
 kensa は、AWS Well-Architected(W-A)レビューを、**実環境(読み取り専用)・IaC/GitHub(設定と活動実績)・ビジネス要件の質問**から埋める、*非公式*のコミュニティ製プラグイン(Claude Code / Agent Plugins 形式)です。最新のレンズ(別のレンズも可)を取得し、証拠で決まらないことだけを質問し、全項目を埋めた xlsx を出力し、回答を AWS Well-Architected Tool(W-A Tool)に記録し、AWS Foundational Technical Review(FTR)の事前チェックまで行います。
 
-> バージョン 0.3.0。オフラインで動く部分は自動テスト済み。AWS スキャナーは 1 つの開発用アカウントで、W-A Tool への書き込みはテスト用ワークロード 1 つで実機確認した。確認した範囲と未確認の範囲は [検証状況](docs/ja/verification.md) にある。
+> バージョン 0.3.1。オフラインで動く部分は自動テスト済み。AWS スキャナーは 1 つの開発用アカウントで、W-A Tool への書き込みはテスト用ワークロード 1 つで実機確認した。確認した範囲と未確認の範囲は [検証状況](docs/ja/verification.md) にある。
 
 ## 始める(Claude Code)
 
@@ -60,7 +60,7 @@ GitHub のリポジトリ https://github.com/Anti-Pattern-Inc/Kensa にある、
 3. 証拠で決まらなかった項目について、**最大 30 枚の決定カード**に答えます。各カードは ○/△/✗ の選択で、先頭に検出済みの証拠、そして推奨(手順・工数・優先度・担当)が付きます。
 4. xlsx が出来上がります([出力](#出力xlsx))。誰も確認していない項目は `✗ / 仮置き(要確認)` のままで、確認済みの項目とは別に数えます。
 
-所要時間は、まだ実際の利用者では測っていません。自分で調整できるのは質問の数です(知っているものに答え、残りは仮置きにできます)。どこで止めても、`/kensa:resume` で再開できます。
+外部の担当者による最初の試用(Kiro)では、初回のレビュー全体で、エージェントの作業だけで約 28 分かかりました(これに回答の時間が加わります)。自分で調整できるのは質問の数です(知っているものに答え、残りは仮置きにできます。`cards next --pillar` でカードを一部のピラーに絞ることもできます)。どこで止めても、`/kensa:resume`(Kiro では `/kensa-resume`)で再開できます。Python・uv・AWS CLI・読み取り専用ロールは事前に準備してください: [事前準備チェックリスト](docs/ja/getting-started.md#0-当日までに-事前準備チェックリスト)。
 
 ## AWS へのアクセスレベルを選ぶ
 
@@ -78,6 +78,7 @@ GitHub のリポジトリ https://github.com/Anti-Pattern-Inc/Kensa にある、
 - **AWS の文章を同梱していません。** 質問文・ベストプラクティス文は、実行時に利用者自身の W-A Tool から取得します(`seed --from-wa-tool`)。`tests/fixtures/` は、質問タイトルやベストプラクティス名も含めて合成データです(`QuestionId`・`ChoiceId` は経路表のキーなので、実際の識別子を使っています)。`assets/routing.json` の経路分類は本プロジェクトの設計判断で、AWS 公式の分類ではありません(`QuestionId`・`ChoiceId` は経路表のキーとして、AWS の識別子をそのまま使っています)。
 - **実行すると AWS に触れます。** スキャンは読み取りのみですが、`scan-aws` は Cost Explorer の API を数回呼びます(AWS の料金は 1 リクエストあたり 0.01 USD。ページごとに課金)。`push --apply` と `workload-create --apply` は W-A Tool に書き込みます。
 - **ドキュメント検索の MCP(`aws-docs`)を同梱しており、Claude Code ではプラグインを有効にすると起動します。** AWS が管理する公開エンドポイントへの、認証なし・ドキュメント検索専用の接続で、資格情報は使いません。検索語とページの URL が、インターネット経由で AWS に送られます(スキャン結果は送りません)。`/mcp` から無効にできます。[docs/aws-mcp.md](docs/ja/aws-mcp.md) を参照。
+- **自分のアカウントで、読み取り専用ロールで実行する。** kensa は各自の資格情報で動き、私たちが何かを集めることはありません。エージェントが読んだもの(スキャン結果を含む)は、エージェントのモデルの提供元に送られます。AWS の外に出したくない場合は、Kiro か Amazon Bedrock 上の Claude Code を使ってください(エージェントのデータの設定も確認してください)。
 - **まずテスト用のアカウントとワークロードで。** 管理者権限のプロファイルは使わないでください(エージェントはシェルを持つため、プロファイルの資格情報は他の `aws` コマンドにも使われうる)。読み取り専用ロールのテンプレートは [`iam/scan-role.yaml`](iam/scan-role.yaml)([解説](docs/ja/aws-iam.md))。
 - 本ソフトウェアは現状有姿で提供されます(Apache-2.0)。IAM テンプレートは第三者の監査を受けていません。
 
@@ -110,8 +111,8 @@ GitHub のリポジトリ https://github.com/Anti-Pattern-Inc/Kensa にある、
 要件: Python 3.11 以上。
 
 - **Claude Code**: `/plugin marketplace add Anti-Pattern-Inc/Kensa` → `/plugin install kensa@anti-pattern-plugins`。Claude Code 2.1.275 以降なら 1 コマンドでもよい: `/plugin install kensa --marketplace Anti-Pattern-Inc/Kensa`。ローカルのクローンからは `/plugin marketplace add ./Kensa`。
-- **Kiro(Power)**: Powers パネル → **Add Custom Power** → **Import power from GitHub**(`https://github.com/Anti-Pattern-Inc/Kensa`)。クローンしたフォルダからは **Import power from a folder**。Power はルートの `plugin.json`・`skills/`(Agent Plugins 形式)をそのまま使う。会話でキーワード(`well-architected`、`wafr`、`ftr`、`w-a-tool`、`kensa`)に触れると有効になる。**Kiro の実機では未確認**(公式ドキュメントの仕様と、Agent Plugins のスキーマでの検証まで)。
-- **GitHub CLI(`gh skill`。2.90 以降、プレビュー)**: `gh skill install Anti-Pattern-Inc/Kensa --all --agent claude-code`。`--agent` は `kiro-cli`、`codex`、`cursor` などにも変えられ、`--scope user` で全体に入れる。**入るのは `skills/` の 2 つのスキルだけ**(スクリプト・アセット・参考資料は各スキルの中にある)。`iam/` のテンプレート、`optional/`、`docs/` は入らないので、必要ならリポジトリから取得する。2 つは続けて使う(`kensa-partner-record` は `kensa-review` のスクリプトを使う)ので、`--all` で入れる。
+- **Kiro(Power)**: Powers パネル → **Add Custom Power** → **Import power from GitHub**(`https://github.com/Anti-Pattern-Inc/Kensa`)。クローンしたフォルダからは **Import power from a folder**。Power はルートの `plugin.json`・`skills/`(Agent Plugins 形式)をそのまま使う。会話でキーワード(`well-architected`、`wafr`、`ftr`、`w-a-tool`、`kensa`)に触れると有効になる。外部の試用 1 件で、Kiro の実機でスキャンから W-A Tool への記録までレビューが動いた([検証状況](docs/ja/verification.md))。**Kiro には Claude Code のコマンドではなくスキルが出る**: `/kensa-demo`(= `/kensa:demo`)、`/kensa-review`(= `/kensa:start`)、`/kensa-resume`(= `/kensa:resume`)、`/kensa-partner-record`(= `/kensa:record`)。承認のプロンプトを減らすには [はじめに → Kiro](docs/ja/getting-started.md#kiro)。
+- **GitHub CLI(`gh skill`。2.90 以降、プレビュー)**: `gh skill install Anti-Pattern-Inc/Kensa --all --agent claude-code`。`--agent` は `kiro-cli`、`codex`、`cursor` などにも変えられ、`--scope user` で全体に入れる。**入るのは `skills/` の 4 つのスキルだけ**(`kensa-review`・`kensa-partner-record`・`kensa-demo`・`kensa-resume`。スクリプト・アセット・参考資料は `kensa-review` の中にある)。`iam/` のテンプレート、`optional/`、`docs/` は入らないので、必要ならリポジトリから取得する。ほかの 3 つは `kensa-review` のスクリプトを使うので、`--all` で入れる。
 - **その他の Agent Plugins 対応エージェント**: 同じルートの `plugin.json`・`skills/` を読む。
 - **スクリプトの依存**: xlsx 出力に `openpyxl`、AWS 系のサブコマンドに `boto3`。**`uv` を勧める**: `kensa.py` の先頭に依存と Python の版を書いてあるので、`uv run skills/kensa-review/scripts/kensa.py …` だけで初回に自動取得して動く。`uv` が無ければ `pip install openpyxl boto3` のうえ `python3` で動く。
 - **MCP**: 認証なしのドキュメント検索(`aws-docs`)を同梱している(`.mcp.json` / `mcp.json`)。IAM 認証つきで API も呼べる構成(`optional/aws-mcp.json`)は、任意で追加できる。[docs/aws-mcp.md](docs/ja/aws-mcp.md)
