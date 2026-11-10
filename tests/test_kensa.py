@@ -203,6 +203,20 @@ class Flow(unittest.TestCase):
         self.assertNotEqual(code, 0)
         self.assertIn("verdict", err)
 
+    def test_cards_can_be_limited_to_pillars(self):
+        # F2: a time-boxed session covers only some pillars; `cards next --pillar` asks only their cards
+        run(["plan", "--skip", "repo,aws"], self.d)
+        _, all_out, _ = run(["cards", "next", "-n", "99"], self.d)
+        _, ops, _ = run(["cards", "next", "-n", "99", "--pillar", "operationalExcellence"], self.d)
+        self.assertIn("C-OPS-OWNERSHIP", ops)
+        self.assertLess(ops.count("###"), all_out.count("###"))
+        _, by_name, _ = run(["cards", "next", "-n", "99", "--pillar", "Operational Excellence"], self.d)
+        self.assertEqual(by_name, ops)
+        _, listed, _ = run(["cards", "list", "--pillar", "operationalExcellence"], self.d)
+        self.assertIn("C-OPS-OWNERSHIP", listed)
+        _, none, _ = run(["cards", "next", "--pillar", "nosuchpillar"], self.d)
+        self.assertIn("No ready card covers pillar(s) nosuchpillar", none)
+
     def test_card_flow_fills_all_covered_items_and_keeps_evidence(self):
         run(["context", "set", "tools.chat=Slack", "team.po=PO"], self.d)
         run(["plan", "--skip", "repo,aws"], self.d)   # these items now have evidence routes: cards open once each is tried/skipped
@@ -589,6 +603,9 @@ class WaTool(unittest.TestCase):
         calls = []
 
         class C:
+            def list_answers(self, **kw):
+                return {"AnswerSummaries": []}
+
             def update_answer(self, **kw):
                 calls.append(kw)
                 if kw["QuestionId"] == "q2":
@@ -1209,6 +1226,9 @@ class MilestoneAndAssumed(unittest.TestCase):
         calls = []
 
         class C:
+            def list_answers(self, **kw):
+                return {"AnswerSummaries": []}
+
             def update_answer(self, **kw):
                 calls.append(("update_answer", kw["QuestionId"]))
 
@@ -1224,6 +1244,9 @@ class MilestoneAndAssumed(unittest.TestCase):
         calls = []
 
         class C:
+            def list_answers(self, **kw):
+                return {"AnswerSummaries": []}
+
             def update_answer(self, **kw):
                 if kw["QuestionId"] == "q3":
                     raise Fake("ValidationException", "boom")
@@ -1237,16 +1260,135 @@ class MilestoneAndAssumed(unittest.TestCase):
         self.assertTrue(all(r["status"] == "dry-run" for r in res))
         self.assertEqual(calls, [])
 
+    def setUp(self):
+        p = mock.patch.object(kensa_wa.time, "sleep")
+        self.sleeps = p.start()
+        self.addCleanup(p.stop)
+
     def test_milestone_failure_is_reported_not_raised(self):
         class C:
+            def list_answers(self, **kw):
+                return {"AnswerSummaries": []}
+
             def update_answer(self, **kw):
                 pass
 
             def create_milestone(self, **kw):
-                raise Fake("ConflictException", "exists")
+                raise Fake("ValidationException", "name already used")
         res = kensa_wa.push("w", self.items(), apply=True, c=C(), milestone="2026Q4-review")
         self.assertEqual(res[-1]["status"], "milestone-error")
         self.assertEqual(sum(1 for r in res if r["status"] == "updated"), 3)
+
+    def test_a_busy_workload_is_retried(self):
+        # F5: right after UpdateAnswer, CreateMilestone answered ConflictException (the workload was still busy); wait and try again
+        n = {"m": 0}
+
+        class C:
+            def list_answers(self, **kw):
+                return {"AnswerSummaries": []}
+
+            def update_answer(self, **kw):
+                pass
+
+            def create_milestone(self, **kw):
+                n["m"] += 1
+                if n["m"] < 3:
+                    raise Fake("ConflictException", "busy")
+                return {"MilestoneNumber": 7}
+        res = kensa_wa.push("w", self.items(), apply=True, c=C(), milestone="2026Q4-review")
+        self.assertEqual(res[-1], {"question_id": "(milestone)", "status": "milestone", "milestone": "2026Q4-review", "number": 7})
+        self.assertEqual(self.sleeps.call_count, 2)
+
+    def test_existing_answers_are_saved_as_a_milestone_before_they_are_overwritten(self):
+        # F9: a push --apply overwrote 14 answers that could not be restored afterwards
+        calls = []
+
+        class C:
+            def list_answers(self, **kw):
+                calls.append(("list_answers", kw.get("NextToken")))
+                if not kw.get("NextToken"):
+                    return {"AnswerSummaries": [{"QuestionId": "q1", "SelectedChoices": ["a"]}, {"QuestionId": "q2", "SelectedChoices": []}],
+                            "NextToken": "t"}
+                return {"AnswerSummaries": [{"QuestionId": "q3", "SelectedChoices": [], "IsApplicable": False}]}
+
+            def update_answer(self, **kw):
+                calls.append(("update_answer", kw["QuestionId"]))
+
+            def create_milestone(self, **kw):
+                calls.append(("create_milestone", kw["MilestoneName"]))
+                return {"MilestoneNumber": 1}
+        res = kensa_wa.push("w", self.items(), apply=True, c=C())
+        names = [c for c in calls if c[0] != "list_answers"]
+        self.assertEqual(names[0][0], "create_milestone")
+        self.assertRegex(names[0][1], r"^kensa-before-push-\d{8}T\d{6}Z$")
+        self.assertEqual(sum(1 for c in names if c[0] == "update_answer"), 3)
+        self.assertEqual(res[0]["status"], "backup-milestone")
+        self.assertEqual(res[0]["existing"], 2)
+
+    def test_no_backup_milestone_for_an_empty_workload_or_when_turned_off(self):
+        made = []
+
+        class C:
+            def __init__(self, answered):
+                self.answered = answered
+
+            def list_answers(self, **kw):
+                return {"AnswerSummaries": [{"QuestionId": "q1", "SelectedChoices": ["a"] if self.answered else []}]}
+
+            def update_answer(self, **kw):
+                pass
+
+            def create_milestone(self, **kw):
+                made.append(kw)
+                return {}
+        kensa_wa.push("w", self.items(), apply=True, c=C(False))
+        kensa_wa.push("w", self.items(), apply=True, c=C(True), backup=False)
+        self.assertEqual(made, [])
+
+    def test_nothing_is_written_when_the_backup_milestone_fails(self):
+        updated = []
+
+        class C:
+            def list_answers(self, **kw):
+                return {"AnswerSummaries": [{"QuestionId": "q1", "SelectedChoices": ["a"]}]}
+
+            def update_answer(self, **kw):
+                updated.append(kw)
+
+            def create_milestone(self, **kw):
+                raise Fake("AccessDeniedException", "no CreateMilestone")
+        res = kensa_wa.push("w", self.items(), apply=True, c=C(), milestone="2026Q4-review")
+        self.assertEqual([r["status"] for r in res], ["backup-milestone-error"])
+        self.assertEqual(updated, [])
+
+
+class CloudTrailShadowTrails(unittest.TestCase):
+    def test_trails_homed_elsewhere_and_organization_trails_are_counted(self):
+        # F4: a multi-Region trail homed in another Region and an organization trail are shadow trails here; leaving them out reported "no trail"
+        calls = []
+
+        class CT(FakeClient):
+            def describe_trails(self, **kw):
+                calls.append(kw)
+                return {"trailList": [
+                    {"TrailARN": "arn:aws:cloudtrail:us-east-1:111111111111:trail/main", "HomeRegion": "us-east-1", "IsMultiRegionTrail": True},
+                    {"TrailARN": "arn:aws:cloudtrail:us-east-1:111111111111:trail/main", "HomeRegion": "us-east-1", "IsMultiRegionTrail": True},
+                    {"TrailARN": "arn:aws:cloudtrail:us-east-1:999999999999:trail/org", "HomeRegion": "us-east-1", "IsMultiRegionTrail": True,
+                     "IsOrganizationTrail": True}]}
+
+            def get_trail_status(self, Name):
+                if "999999999999" in Name:
+                    raise Fake("TrailNotFoundException")
+                return {"IsLogging": True}
+
+        class S:
+            def c(self, svc, r):
+                return CT(svc, {})
+        out = kensa_scan._ct(S(), "ap-northeast-1")
+        self.assertEqual(calls, [{"includeShadowTrails": True}])
+        self.assertEqual(len(out["trails"]), 2)
+        self.assertTrue(all(t["shadow"] and t["home_region"] == "us-east-1" for t in out["trails"]))
+        self.assertEqual([t["is_logging"] for t in out["trails"]], [True, None])
 
 
 def named_exc(name, msg="x"):
@@ -2046,7 +2188,7 @@ class Packaging(unittest.TestCase):
         import re
         base = os.path.join(ROOT, "skills")
         names = sorted(d for d in os.listdir(base) if os.path.isdir(os.path.join(base, d)))
-        self.assertEqual(names, ["kensa-partner-record", "kensa-review"])
+        self.assertEqual(names, ["kensa-demo", "kensa-partner-record", "kensa-resume", "kensa-review"])
         for n in names:
             text = read_text(os.path.join(base, n, "SKILL.md"))
             m = re.match(r"---\n(.*?)\n---\n", text, re.S)
@@ -2061,6 +2203,36 @@ class Packaging(unittest.TestCase):
             self.assertLessEqual(len(fm.get("compatibility", "")), 500, n)
         self.assertTrue(os.path.isfile(os.path.join(base, "kensa-review", "scripts", "kensa.py")))
         self.assertTrue(os.path.isfile(os.path.join(base, "kensa-review", "assets", "cards.json")))
+
+    def test_every_claude_code_command_has_a_skill_for_other_agents(self):
+        # F3: Kiro reads skills/ but not commands/, so /kensa:demo, /kensa:resume and /kensa:record need a skill of their own (start = kensa-review)
+        cmds = sorted(f[:-3] for f in os.listdir(os.path.join(ROOT, "commands")) if f.endswith(".md"))
+        self.assertEqual(cmds, ["demo", "record", "resume", "start"])
+        skill_for = {"demo": "kensa-demo", "record": "kensa-partner-record", "resume": "kensa-resume", "start": "kensa-review"}
+        for c in cmds:
+            self.assertTrue(os.path.isfile(os.path.join(ROOT, "skills", skill_for[c], "SKILL.md")), c)
+
+    def test_skills_forbid_wrapping_the_cli_in_a_shell_function(self):
+        # F6: Kiro asked for approval on every call because `W` was defined as a shell function or variable (and zsh did not split the variable)
+        for n in ("kensa-review", "kensa-partner-record", "kensa-demo", "kensa-resume"):
+            text = read_text(os.path.join(ROOT, "skills", n, "SKILL.md"))
+            self.assertIn("Never define `W`", text, n)
+            self.assertIn("one command per call", text, n)
+
+    def test_kiro_permissions_match_the_claude_code_allowlist_and_never_allow_aws(self):
+        # F6: the Kiro sample allows exactly the local-only subcommands that docs/getting-started.md allows for Claude Code
+        import re
+        text = read_text(os.path.join(ROOT, "optional", "kiro-permissions.yaml"))
+        body = text.partition("rules:")[2]
+        allow = re.findall(r'^      - "(uv run [^"]+)"$', body.partition("exclude:")[0], re.M)
+        guide = read_text(os.path.join(ROOT, "docs", "getting-started.md"))
+        cc = re.findall(r'"Bash\((uv run [^)]+)\)"', guide)
+        self.assertTrue(allow)
+        self.assertEqual(allow, cc)
+        for bad in ("scan-aws", "push", "precheck", "workload-create", "from-wa-tool", "auth-check", "export", "scan-repo"):
+            self.assertFalse([m for m in allow if bad in m], bad)
+        self.assertIn("effect: allow", body)
+        self.assertNotRegex(body, r'"uv run \*"')
 
     def test_activation_keywords_are_specific(self):
         # Kiro activates a Power when the conversation touches a keyword. Do not include words that would activate it in every AWS conversation

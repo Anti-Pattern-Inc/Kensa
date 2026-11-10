@@ -1,12 +1,12 @@
 {
   "name": "anti-pattern-plugins",
   "owner": {"name": "株式会社アンチパターン"},
-  "metadata": {"description": "Unofficial plugins for AWS Well-Architected reviews", "version": "0.3.0"},
+  "metadata": {"description": "Unofficial plugins for AWS Well-Architected reviews", "version": "0.3.1"},
   "plugins": [
     {
       "name": "kensa",
       "source": "./",
-      "version": "0.3.0",
+      "version": "0.3.1",
       "category": "development",
       "description": "Fills in an AWS Well-Architected review from the live environment, IaC/GitHub and interviews, then exports xlsx, records to the W-A Tool and runs an FTR pre-check. Unofficial.",
       "license": "Apache-2.0",
