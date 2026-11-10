@@ -112,7 +112,11 @@ Claude Code では `/kensa:demo`、Kiro では `/kensa-demo` を実行します�
 
 ### Kiro
 
-[`optional/kiro-permissions.yaml`](../../optional/kiro-permissions.yaml) のルールを `~/.kiro/settings/permissions.yaml` に写します(Kiro は権限のルールをホームディレクトリからだけ読み、リポジトリからは読みません。[Kiro の権限](https://kiro.dev/docs/permissions/))。上の一覧と同じ、ローカルだけのサブコマンドを許可し、AWS に触れるものは引き続き確認を求めます。
+[`optional/kiro-permissions.yaml`](../../optional/kiro-permissions.yaml) のルールを `~/.kiro/settings/permissions.yaml` に写します(Kiro は権限のルールをホームディレクトリからだけ読み、リポジトリからは読みません。[Kiro の権限](https://kiro.dev/docs/permissions/))。ローカルだけのサブコマンド(`--dir` 付きも含む)、kensa のスキルの読み込み、スキルのファイルの読み取りを許可し、AWS に触れるものは引き続き確認を求めます。
+
+- このルールが効くのは **Kiro IDE 1.x** と、**V3 エンジンの Kiro CLI**(`kiro-cli chat --v3`)です。CLI の既定の V2 エンジンは `permissions.yaml` を読まず、コマンドのたびに確認します。
+- kiro-cli 2.23.1 の `--v3` で確認しました: `/kensa-demo` は `export` 以外は確認なしで最後まで動き、`/kensa-resume` は `plan`・`status`・`cards next --pillar` を実行しました。`push`・`export`・`scan-aws` は、意図どおり承認待ちになりました。
+- 確認が出るもの(意図したもの、または Kiro の仕様): `export`、AWS に触れるコマンド、スキルを `~/.kiro/` に入れた場合のスキルの参考資料の読み込み。Kiro V3 はスキルの本文だけをエージェントに渡すので、最初に `ls -d` で `kensa-review` の場所を探します。
 
 - 承認のプロンプトで **`uv run *`(や `python3 *`)を「Always allow」にしないでください**。どんなスクリプトも確認なしで動くようになり、`scan-aws`、`push --apply`、`workload-create --apply` も通ります。Kiro では、どこか 1 か所に `allow` があれば足ります。
 - kensa のスキルは、呼び出しを毎回 1 行のコマンド(`uv run …/kensa.py <サブコマンド> …`)で、1 回に 1 コマンドずつ書くようエージェントに指示しています。それでもエージェントがシェルの関数や変数(`W() {…}`、`W="uv run …"`)を作っていたら、やめるよう伝えてください。呼び出しのたびに承認が要るようになり、zsh では変数の形は失敗します。

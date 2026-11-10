@@ -38,5 +38,5 @@
 - **成果物の言語は `en`(既定)と `ja` だけ。** CLI のメッセージ・スキル・参考資料は英語で、エージェントが利用者の言語で伝える。他の言語の成果物は英語で出力され、エージェントが提示時に訳す。日本語の質問カード(`assets/cards.ja.json`)は英語版(`assets/cards.json`)とは別に保守しており、内容がずれることがある。CSV・xlsx の取り込みは、英語と日本語のどちらの列名(`Verdict` / `判定`、`Org shape / tools` / `組織の形、ツール`)も受け付ける。
 - `gh api` は `--method GET` を明示していない(`gh api` の既定は GET)。
 - **`gh skill install` ではスキルだけが入る。** `docs/`・`iam/`・`optional/` は入らない(IAM テンプレートはリポジトリから取得する)。ドキュメント検索の MCP(`aws-docs`)は Claude Code 向けに同梱されていて、この方法では入らない。使いたければ `mcp.json` の `mcpServers` を自分で追加する([AWS MCP Server](aws-mcp.md))。未接続の場合は `improvement_url` を直接開く手順になる。
-- Kiro: スキルは、外部の試用 1 件(v0.3.0)で Kiro の実機で動いた。v0.3.1 の修正、`optional/kiro-permissions.yaml`、MCP の接続は、まだ Kiro では試していない([検証状況](verification.md))。Kiro には Claude Code のコマンドは出ず、スキルだけが出る: `/kensa-demo`・`/kensa-review`・`/kensa-resume`・`/kensa-partner-record` を使う。
+- Kiro: スキルは、外部の試用 1 件(v0.3.0)で Kiro の実機で動いた。v0.3.1 は Kiro CLI(V3 エンジン)では確認したが、Kiro IDE ではまだ。MCP の接続は試していない。`permissions.yaml` は CLI の既定の V2 エンジンでは読まれない([検証状況](verification.md))。Kiro には Claude Code のコマンドは出ず、スキルだけが出る: `/kensa-demo`・`/kensa-review`・`/kensa-resume`・`/kensa-partner-record` を使う。
 - `precheck` が確認するのは、ワークロード**名**にソリューション名が含まれるか(`--solution-name` を指定した場合のみ)。AWS はワークロードの説明にソリューション名を書く形も認めているが、`precheck` はそちらを確認しない。

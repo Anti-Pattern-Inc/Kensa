@@ -112,7 +112,11 @@ Every `W …` call is a Bash call, so a full review can mean many approvals. You
 
 ### Kiro
 
-Copy the rule in [`optional/kiro-permissions.yaml`](../optional/kiro-permissions.yaml) into `~/.kiro/settings/permissions.yaml` (Kiro reads permission rules only from your home directory, never from a repository; [Kiro permissions](https://kiro.dev/docs/permissions/)). It allows the same local-only subcommands as the list above and keeps asking for everything that touches AWS.
+Copy the rules in [`optional/kiro-permissions.yaml`](../optional/kiro-permissions.yaml) into `~/.kiro/settings/permissions.yaml` (Kiro reads permission rules only from your home directory, never from a repository; [Kiro permissions](https://kiro.dev/docs/permissions/)). They allow the local-only subcommands (also with `--dir`), loading the kensa skills, and reading their files, and keep asking for everything that touches AWS.
+
+- These rules apply in the **Kiro IDE 1.x** and in **Kiro CLI on the V3 engine** (`kiro-cli chat --v3`). The CLI's default V2 engine ignores `permissions.yaml` and asks for every command.
+- Checked with kiro-cli 2.23.1 `--v3`: `/kensa-demo` ran through without a prompt except `export`, and `/kensa-resume` ran `plan`, `status` and `cards next --pillar`. `push`, `export` and `scan-aws` were held for approval, as intended.
+- Still asked about, by design or by Kiro: `export`, every AWS-touching command, and (when the skills are installed under `~/.kiro/`) opening a skill's reference file. Kiro V3 also gives the agent only the text of a skill, so its first call is an `ls -d` to find where `kensa-review` is installed.
 
 - **Never choose "Always allow" for `uv run *`** (or `python3 *`) in the approval prompt. It lets any script run without asking, including `scan-aws`, `push --apply` and `workload-create --apply`, and in Kiro one `allow` in any scope is enough.
 - The kensa skills tell the agent to write every call as one plain command (`uv run …/kensa.py <subcommand> …`), one per call. If you still see the agent defining a shell function or variable for it (`W() {…}`, `W="uv run …"`), tell it to stop: every call then needs its own approval, and under zsh the variable form fails.

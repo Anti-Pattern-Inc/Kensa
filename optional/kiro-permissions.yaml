@@ -1,43 +1,65 @@
-# kensa: pre-approved shell commands for Kiro (fewer approval prompts during a review).
+# kensa: pre-approved actions for Kiro (fewer approval prompts during a review).
 #
-# Copy the rule below into ~/.kiro/settings/permissions.yaml (all workspaces; merge it into an existing `rules:` list).
+# Copy the rules below into ~/.kiro/settings/permissions.yaml (all workspaces; merge them into an existing `rules:` list).
 # Kiro does not read a permissions file from the repository, so this file does nothing where it is.
-# Format: https://kiro.dev/docs/permissions/ (capability / match / exclude / effect). Written from that documentation;
-# not exercised in a live Kiro session yet.
+# Format: https://kiro.dev/docs/permissions/ (capability / match / exclude / effect). The Kiro IDE 1.x and Kiro CLI
+# sessions on the V3 engine (`kiro-cli chat --v3`) read these rules; the CLI's default V2 engine ignores permissions.yaml.
+# Checked with kiro-cli 2.23.1 --v3 on 2026-11-10 (/kensa-demo and /kensa-resume ran end to end).
 #
-# Only the LOCAL subcommands are allowed: they read or write `.kensa/` and the repository you point them at.
-# Left out on purpose, so that Kiro keeps asking: auth-check, scan-aws, seed --from-wa-tool, push, precheck, workload-create
-# (they touch AWS), export (writes wherever --out says) and scan-repo (calls gh with --gh).
+# 1. shell: only the LOCAL kensa subcommands (they read or write `.kensa/` and the repository you point them at), plus
+#    `command -v uv`, `uv --version` and `ls -d …kensa-review…`, which the skills use to choose how to run the CLI and
+#    to find it. Excluded, so that Kiro keeps asking: auth-check, scan-aws, seed --from-wa-tool, push, precheck,
+#    workload-create and any --apply (they touch AWS), export (writes wherever --out says) and scan-repo (calls gh).
+#    The patterns allow anything between kensa.py and the subcommand, so global options such as `--dir .kensa-demo`
+#    or `--lang ja` still match. That is safe only because of the exclude list: a command that also matches an exclude
+#    is not allowed (an exclude that hits a harmless command, such as a note mentioning "push", only brings the prompt
+#    back). Each part of a chained command is checked on its own. Without uv, copy the rule with `python3 *kensa.py*…`.
+# 2. skill: Kiro V3 asks before loading a skill; this allows the kensa skills by name.
+# 3. fs_read: lets the agent read the skills' reference files when they are in the workspace's `.kiro/skills/`.
+#    Under `~/.kiro/` no rule helped in our check (absolute, `~` and `**` forms were all still asked about), so with the
+#    skills installed there, expect a prompt when the agent opens a reference file.
 #
-# Do NOT "Always allow" `uv run *` (or `python3 *`) from the approval prompt: it lets any script run,
-# including the kensa subcommands that touch AWS, and an `allow` anywhere is enough for Kiro to stop asking.
-#
-# These patterns match only when the agent writes the command on one line, starting with `uv run`, with the
-# subcommand right after kensa.py (the kensa skills tell it to). A global option before the subcommand
-# (`kensa.py --dir X plan`) does not match and just prompts. Without uv, copy the rules with `python3 *kensa.py …`.
+# Do NOT "Always allow" `uv run *` (or `python3 *`) from an approval prompt: it lets any script run, including the
+# kensa subcommands that touch AWS, and an `allow` anywhere is enough for Kiro to stop asking.
 rules:
   - capability: shell
     effect: allow
     match:
-      - "uv run *kensa.py doctor*"
-      - "uv run *kensa.py plan*"
-      - "uv run *kensa.py status*"
-      - "uv run *kensa.py coverage*"
-      - "uv run *kensa.py items*"
-      - "uv run *kensa.py diff*"
-      - "uv run *kensa.py business *"
-      - "uv run *kensa.py cards *"
-      - "uv run *kensa.py context *"
-      - "uv run *kensa.py apply *"
-      - "uv run *kensa.py finalize*"
-      - "uv run *kensa.py snapshot*"
-      - "uv run *kensa.py scan-iac*"
-      - "uv run *kensa.py seed --from-csv *"
-      - "uv run *kensa.py iam-policy *"
+      - "uv run *kensa.py*doctor*"
+      - "uv run *kensa.py*init*"
+      - "uv run *kensa.py*plan*"
+      - "uv run *kensa.py*status*"
+      - "uv run *kensa.py*coverage*"
+      - "uv run *kensa.py*items*"
+      - "uv run *kensa.py*diff*"
+      - "uv run *kensa.py*business *"
+      - "uv run *kensa.py*cards *"
+      - "uv run *kensa.py*context *"
+      - "uv run *kensa.py*apply *"
+      - "uv run *kensa.py*finalize*"
+      - "uv run *kensa.py*snapshot*"
+      - "uv run *kensa.py*scan-iac*"
+      - "uv run *kensa.py*seed --from-csv *"
+      - "uv run *kensa.py*iam-policy*"
+      - "command -v uv"
+      - "uv --version"
+      - "ls -d *kensa-review*"
     exclude:
-      - "*kensa.py * --apply*"
-      - "*kensa.py *scan-aws*"
-      - "*kensa.py *push*"
-      - "*kensa.py *precheck*"
-      - "*kensa.py *workload-create*"
-      - "*kensa.py *--from-wa-tool*"
+      - "*kensa.py*scan-aws*"
+      - "*kensa.py*push*"
+      - "*kensa.py*precheck*"
+      - "*kensa.py*workload-create*"
+      - "*kensa.py*from-wa-tool*"
+      - "*kensa.py*--apply*"
+      - "*kensa.py*auth-check*"
+      - "*kensa.py*scan-repo*"
+      - "*kensa.py*export*"
+      - "*kensa.py*--allow-root*"
+  - capability: skill
+    effect: allow
+    match:
+      - "kensa-*"
+  - capability: fs_read
+    effect: allow
+    match:
+      - ".kiro/skills/kensa-*/**"
