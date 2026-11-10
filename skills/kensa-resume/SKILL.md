@@ -9,7 +9,7 @@ compatibility: Python 3.11+ (uv recommended). Needs the kensa-review skill insta
 
 Continue the Well-Architected review in this directory with the `kensa-review` skill (next to this one). Its rules (account confirmation before touching AWS, read-only, dry-run before any W-A Tool write) all apply; this skill only fixes how to pick up where the review stopped.
 
-`W` below stands for `uv run <kensa-review skill dir>/scripts/kensa.py` (without `uv`: `python3 …`). **Write the whole command on one line every time, one command per call. Never define `W` as a shell function, alias or variable**, and do not chain commands with `&&`, `;` or pipes (see "Running the CLI" in `kensa-review`).
+`W` below stands for `uv run <kensa-review skill dir>/scripts/kensa.py` (without `uv`: `python3 …`). **Write the whole command on one line every time, one command per call. Never define `W` as a shell function, alias or variable**, and do not chain commands with `&&`, `;` or pipes (see "Running the CLI" in `kensa-review`). If you do not know where the `kensa-review` skill lives (Kiro gives only a skill's text), run `ls -d .kiro/skills/kensa-review ~/.kiro/skills/kensa-review ~/.kiro/powers/*/skills/kensa-review ~/.kiro/powers/installed/*/skills/kensa-review` once, exactly as written and alone in its own call (nothing chained to it), and use the first path it prints; if none exists, ask the user.
 
 1. If there is no `.kensa/worklist.json` here (or in the `--dir` the user names), say so and offer to start a review with `kensa-review`.
 2. Run `W plan` and `W status`, and tell the user in two lines where the review stands (items resolved, scans done, cards left, the next step).

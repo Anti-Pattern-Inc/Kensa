@@ -2225,14 +2225,36 @@ class Packaging(unittest.TestCase):
         text = read_text(os.path.join(ROOT, "optional", "kiro-permissions.yaml"))
         body = text.partition("rules:")[2]
         allow = re.findall(r'^      - "(uv run [^"]+)"$', body.partition("exclude:")[0], re.M)
+        excl = re.findall(r'^      - "([^"]+)"$', body.partition("exclude:")[2], re.M)
         guide = read_text(os.path.join(ROOT, "docs", "getting-started.md"))
-        cc = re.findall(r'"Bash\((uv run [^)]+)\)"', guide)
+        cc = re.findall(r'"Bash\(uv run \*kensa\.py ([^)]+)\)"', guide)
         self.assertTrue(allow)
-        self.assertEqual(allow, cc)
-        for bad in ("scan-aws", "push", "precheck", "workload-create", "from-wa-tool", "auth-check", "export", "scan-repo"):
+        # the same subcommands as Claude Code; Kiro's patterns also allow global options (`--dir X`) before the subcommand
+        subs = [a.replace("uv run *kensa.py*", "", 1).rstrip("*").strip() for a in allow]
+        self.assertEqual(sorted(set(subs) - {"init"}), sorted(c.rstrip("*").strip() for c in cc))
+        # those wide patterns are safe only because every AWS-touching subcommand or flag is excluded
+        for bad in ("scan-aws", "push", "precheck", "workload-create", "from-wa-tool", "--apply", "auth-check", "export", "scan-repo"):
+            self.assertIn(f"*kensa.py*{bad}*", excl, bad)
             self.assertFalse([m for m in allow if bad in m], bad)
         self.assertIn("effect: allow", body)
         self.assertNotRegex(body, r'"uv run \*"')
+
+    def test_kiro_permission_patterns_match_what_they_should(self):
+        # Kiro: `*` matches any sequence of characters; a command is allowed when it matches an allow pattern and no exclude
+        import fnmatch
+        import re
+        body = read_text(os.path.join(ROOT, "optional", "kiro-permissions.yaml")).partition("\nrules:\n")[2]
+        allow = re.findall(r'^      - "([^"]+)"$', body.partition("exclude:")[0], re.M)
+        excl = re.findall(r'^      - "([^"]+)"$', body.partition("exclude:")[2], re.M)
+        ok = lambda cmd: any(fnmatch.fnmatchcase(cmd, p) for p in allow) and not any(fnmatch.fnmatchcase(cmd, p) for p in excl)
+        k = "uv run /home/u/.kiro/skills/kensa-review/scripts/kensa.py"
+        for cmd in ("init --demo", "--dir .kensa-demo init --demo", "--dir .kensa-demo cards next -n 2 --pillar security", "plan",
+                    "--lang ja status", "cards answer C-OPS-OWNERSHIP --current partial --choose recommend", "seed --from-csv a.csv"):
+            self.assertTrue(ok(f"{k} {cmd}"), cmd)
+        for cmd in ("scan-aws", "--dir .kensa-demo push --workload-id x", "push --workload-id x --apply", "auth-check",
+                    "seed --from-wa-tool --workload-id x", "workload-create --name n --apply", "precheck --workload-id x",
+                    "export --format csv --out x.csv", "scan-repo --gh", "--dir d cards next scan-aws"):
+            self.assertFalse(ok(f"{k} {cmd}"), cmd)
 
     def test_activation_keywords_are_specific(self):
         # Kiro activates a Power when the conversation touches a keyword. Do not include words that would activate it in every AWS conversation
